@@ -1,0 +1,30 @@
+#
+# Full default config for git-builder.
+# Copy to /etc/git-builder/config.yaml on the target host and adjust.
+#
+
+# How often to poll all repos (seconds). Default/min: 60. Recommended: 300.
+poll_interval_seconds: 60
+
+# Where to clone repos.
+workdir: /var/lib/git-builder/repos
+
+# SSH key filename under /etc/git-builder (e.g. id_ed25519 or id_rsa).
+ssh_key: id_ed25519
+
+# Optional: GitHub token for HTTPS repos. Prefer env GIT_BUILDER_GITHUB_TOKEN.
+# Fine-grained token with only Contents read (clone/pull): 
+# https://github.com/settings/personal-access-tokens/new?name=git-builder&description=Clone+and+pull+repos+over+HTTPS&contents=read
+# github_token: <token>
+
+# Max repos building at once (sync+script). Default: number of CPUs; min 1.
+# max_concurrent: 4
+
+# Optional: directory for local override scripts named OWNER-REPO.sh (e.g. owner-repo.sh).
+# If set and a matching file exists, it is run instead of the repo's .git-builder.sh (still in repo cwd).
+# local_override_dir: /etc/git-builder/scripts
+
+repos:
+  # SSH (uses ssh_key above) or HTTPS (uses github_token when set). Quote URLs that contain ':'.
+  - url: "https://github.com/OWNER/repo-name.git"
+  # - url: "git@github.com:OWNER/repo-name.git"

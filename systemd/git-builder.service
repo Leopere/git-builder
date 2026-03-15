@@ -1,0 +1,12 @@
+[Unit]
+Description=Git-builder SCM polling service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/git-builder
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
