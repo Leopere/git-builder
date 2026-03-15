@@ -9,10 +9,12 @@ import (
 )
 
 const (
-	DefaultConfigPath   = "/etc/git-builder/config.yaml"
-	DefaultPollInterval = 300
-	DefaultWorkdir      = "/var/lib/git-builder/repos"
-	DefaultSSHKey       = "id_ed25519"
+	DefaultConfigPath    = "/etc/git-builder/config.yaml"
+	DefaultPollInterval  = 60
+	MinPollInterval      = 60
+	RecommendedPollInterval = 300
+	DefaultWorkdir       = "/var/lib/git-builder/repos"
+	DefaultSSHKey        = "id_ed25519"
 )
 
 type Config struct {
@@ -46,6 +48,9 @@ func Load(path string) (*Config, error) {
 
 	if c.PollIntervalSeconds <= 0 {
 		c.PollIntervalSeconds = DefaultPollInterval
+	}
+	if c.PollIntervalSeconds < MinPollInterval {
+		c.PollIntervalSeconds = MinPollInterval
 	}
 	if c.Workdir == "" {
 		c.Workdir = DefaultWorkdir
