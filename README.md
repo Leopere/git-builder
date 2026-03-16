@@ -128,6 +128,8 @@ go test ./...
 
 Requires [gh](https://cli.github.com/) and a tag argument (or it generates a timestamped tag).
 
+**For agents:** See [docs/AGENT.md](docs/AGENT.md) for install, use, and repo conventions. Root `mcp.json` registers the GitHub MCP server; set `GITHUB_PERSONAL_ACCESS_TOKEN` in the environment when using it.
+
 ## License
 
 See [LICENSE](LICENSE). Use and redistribution require attribution to the original author.
