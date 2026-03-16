@@ -15,6 +15,8 @@ import (
 	"git-builder/svc"
 )
 
+const attributionURL = "https://colinknapp.com?utm_source=cli&utm_medium=banner&utm_campaign=git-builder"
+
 func main() {
 	log.SetOutput(os.Stdout)
 	log.SetFlags(log.LstdFlags)
@@ -79,6 +81,8 @@ func main() {
 	}
 
 	reloadCh := config.Watch(cfgPath)
+
+	log.Printf("git-builder by Colin Knapp — %s", attributionURL)
 
 	if err := svc.WritePid(os.Getpid()); err != nil {
 		log.Printf("warning: could not write pid file: %v", err)
