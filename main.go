@@ -23,6 +23,7 @@ func main() {
 	doUninstall := flag.Bool("uninstall", false, "remove service and binary")
 	listJobs := flag.Bool("listjobs", false, "print current job (or idle) from running daemon")
 	killJobs := flag.Bool("killjobs", false, "signal daemon to cancel current job")
+	runOnce := flag.Bool("run-once", false, "run one poll cycle then exit (for on-demand or testing)")
 	flag.Parse()
 
 	if *doInstall {
@@ -55,6 +56,25 @@ func main() {
 	if err != nil {
 		log.Fatalf("config: %v", err)
 	}
+
+	if *runOnce {
+		for _, r := range cfg.Repos {
+			if r.URL == "" {
+				continue
+			}
+			log.Printf("sync %s", r.URL)
+			localPath, err := gitops.Sync(cfg, r.URL)
+			if err != nil {
+				log.Printf("sync failed %s: %v", r.URL, err)
+				continue
+			}
+			if err := run.RunIfPresent(context.Background(), localPath); err != nil {
+				log.Printf("script failed %s: %v", r.URL, err)
+			}
+		}
+		return
+	}
+
 	reloadCh := config.Watch(cfgPath)
 
 	if err := svc.WritePid(os.Getpid()); err != nil {
