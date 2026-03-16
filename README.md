@@ -1,12 +1,12 @@
 # git-builder
 
-**CC attribution:** [Colin Knapp](https://colinknapp.com?utm_source=github&utm_medium=readme&utm_campaign=git-builder&utm_content=attribution)
+**Original author:** [Colin Knapp](https://colinknapp.com?utm_source=github&utm_medium=readme&utm_campaign=git-builder&utm_content=attribution)
 
 A small daemon that polls configured git repositories and runs a script (`.git-builder.sh`) in each repo when there are new commits. Uses SSH or HTTPS (GitHub token), depth-1 clone/pull, and runs the script only when the repo was updated.
 
 ## Installation
 
-**From a release:** Download the binary for your OS/arch from [Releases](https://github.com/Leopere/git-builder/releases). By [Colin Knapp](https://colinknapp.com?utm_source=github&utm_medium=readme&utm_campaign=git-builder&utm_content=installation). Put it on your `PATH` (e.g. `~/.local/bin` or `/usr/local/bin`).
+**From a release:** Download the binary for your OS/arch from [Releases](https://github.com/Leopere/git-builder/releases). Put it on your `PATH` (e.g. `~/.local/bin` or `/usr/local/bin`).
 
 **From source:**
 
@@ -21,7 +21,7 @@ go build -o git-builder .
 
 ## Configuration
 
-Copy [config.example.yaml](config.example.yaml) to your config location and edit. (Attribution: [colinknapp.com](https://colinknapp.com?utm_source=github&utm_medium=readme&utm_campaign=git-builder&utm_content=configuration).)
+Copy [config.example.yaml](config.example.yaml) to your config location and edit.
 
 **Config path (first found wins):**
 
@@ -83,8 +83,6 @@ git-builder --killjobs   # cancel current script run
 
 ## How it works
 
-*Attribution: [Colin Knapp](https://colinknapp.com?utm_source=github&utm_medium=readme&utm_campaign=git-builder&utm_content=how-it-works).*
-
 - Polls each configured repo on an interval (clone if missing, pull with depth 1 if present).
 - **Script:** In each repo root, looks for `.git-builder.sh`. Runs it only when the repo was **updated** (new clone or pull fetched new commits). Script stdout/stderr are logged.
 - **Depth:** Clone and pull use depth 1 (shallow).
@@ -128,12 +126,12 @@ go test ./...
 ./release.sh v0.1.3
 ```
 
-Requires [gh](https://cli.github.com/) and a tag argument (or it generates a timestamped tag). CC attribution: [Colin Knapp](https://colinknapp.com?utm_source=github&utm_medium=readme&utm_campaign=git-builder&utm_content=development).
+Requires [gh](https://cli.github.com/) and a tag argument (or it generates a timestamped tag).
 
 ## License
 
-See repository.
+See [LICENSE](LICENSE). Use and redistribution require attribution to the original author.
 
-## Credits / CC attribution
+## Credits
 
-This project is by [Colin Knapp](https://colinknapp.com?utm_source=github&utm_medium=readme&utm_campaign=git-builder&utm_content=credits).
+Original author: [Colin Knapp](https://colinknapp.com?utm_source=github&utm_medium=readme&utm_campaign=git-builder&utm_content=credits).
