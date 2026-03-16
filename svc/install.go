@@ -30,6 +30,16 @@ WantedBy=multi-user.target
 `
 )
 
+// hasSystemd reports whether systemd is the running init (e.g. typical Linux).
+// Prefer checking the directory to avoid spawning systemctl.
+func hasSystemd() bool {
+	info, err := os.Stat("/run/systemd/system")
+	if err != nil {
+		return false
+	}
+	return info.IsDir()
+}
+
 func launchdPlistContent(bin, configPath, runDir, keyDir, logPath string) string {
 	return fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -70,6 +80,9 @@ func Install() error {
 	}
 	if runtime.GOOS == "darwin" {
 		return installLaunchdUser(self)
+	}
+	if !hasSystemd() {
+		return fmt.Errorf("systemd not detected; install is supported on macOS (launchd) or Linux with systemd")
 	}
 	if err := copyFile(self, installBin); err != nil {
 		return fmt.Errorf("copy binary: %w", err)
@@ -189,13 +202,17 @@ func Uninstall() error {
 		fmt.Println("uninstalled git-builder service")
 		return nil
 	}
-	_ = run("systemctl", "stop", "git-builder")
-	_ = run("systemctl", "disable", "git-builder")
-	if err := os.Remove(installUnit); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("remove unit: %w", err)
-	}
-	if err := run("systemctl", "daemon-reload"); err != nil {
-		return err
+	if hasSystemd() {
+		_ = run("systemctl", "stop", "git-builder")
+		_ = run("systemctl", "disable", "git-builder")
+		if err := os.Remove(installUnit); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove unit: %w", err)
+		}
+		if err := run("systemctl", "daemon-reload"); err != nil {
+			return err
+		}
+	} else {
+		_ = os.Remove(installUnit)
 	}
 	if err := os.Remove(installBin); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove binary: %w", err)

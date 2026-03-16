@@ -63,9 +63,12 @@ func main() {
 				continue
 			}
 			log.Printf("sync %s", r.URL)
-			localPath, err := gitops.Sync(cfg, r.URL)
+			localPath, updated, err := gitops.Sync(cfg, r.URL)
 			if err != nil {
 				log.Printf("sync failed %s: %v", r.URL, err)
+				continue
+			}
+			if !updated {
 				continue
 			}
 			if err := run.RunIfPresent(context.Background(), localPath); err != nil {
@@ -96,9 +99,12 @@ func main() {
 				continue
 			}
 			log.Printf("sync %s", r.URL)
-			localPath, err := gitops.Sync(cfg, r.URL)
+			localPath, updated, err := gitops.Sync(cfg, r.URL)
 			if err != nil {
 				log.Printf("sync failed %s: %v", r.URL, err)
+				continue
+			}
+			if !updated {
 				continue
 			}
 			ctx, c := context.WithCancel(context.Background())

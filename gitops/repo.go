@@ -14,7 +14,9 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 )
 
-func Sync(c *config.Config, repoURL string) (localPath string, err error) {
+// Sync clones or pulls the repo. Returns (localPath, updated, err).
+// updated is true when the repo was just cloned or pull fetched new commits.
+func Sync(c *config.Config, repoURL string) (localPath string, updated bool, err error) {
 	dirName := repoDirName(repoURL)
 	localPath = filepath.Join(c.Workdir, dirName)
 
@@ -26,42 +28,44 @@ func Sync(c *config.Config, repoURL string) (localPath string, err error) {
 	} else {
 		auth, err = ssh.NewPublicKeysFromFile("git", c.SSHKeyPath(), "")
 		if err != nil {
-			return "", fmt.Errorf("ssh key %s: %w", c.SSHKeyPath(), err)
+			return "", false, fmt.Errorf("ssh key %s: %w", c.SSHKeyPath(), err)
 		}
 	}
 
 	if err := os.MkdirAll(c.Workdir, 0755); err != nil {
-		return "", fmt.Errorf("mkdir workdir: %w", err)
+		return "", false, fmt.Errorf("mkdir workdir: %w", err)
 	}
 
 	_, err = os.Stat(filepath.Join(localPath, ".git"))
 	if err != nil {
 		if os.IsNotExist(err) {
 			_, err = git.PlainClone(localPath, false, &git.CloneOptions{
-				URL:  repoURL,
-				Auth: auth,
+				URL:   repoURL,
+				Auth:  auth,
+				Depth: 1,
 			})
 			if err != nil {
-				return "", fmt.Errorf("clone %s: %w", repoURL, err)
+				return "", false, fmt.Errorf("clone %s: %w", repoURL, err)
 			}
-			return localPath, nil
+			return localPath, true, nil
 		}
-		return "", fmt.Errorf("stat repo dir: %w", err)
+		return "", false, fmt.Errorf("stat repo dir: %w", err)
 	}
 
 	r, err := git.PlainOpen(localPath)
 	if err != nil {
-		return "", fmt.Errorf("open repo: %w", err)
+		return "", false, fmt.Errorf("open repo: %w", err)
 	}
 	w, err := r.Worktree()
 	if err != nil {
-		return "", fmt.Errorf("worktree: %w", err)
+		return "", false, fmt.Errorf("worktree: %w", err)
 	}
-	err = w.Pull(&git.PullOptions{Auth: auth})
+	err = w.Pull(&git.PullOptions{Auth: auth, Depth: 1})
 	if err != nil && err != git.NoErrAlreadyUpToDate {
-		return "", fmt.Errorf("pull %s: %w", repoURL, err)
+		return "", false, fmt.Errorf("pull %s: %w", repoURL, err)
 	}
-	return localPath, nil
+	updated = (err != git.NoErrAlreadyUpToDate)
+	return localPath, updated, nil
 }
 
 func repoDirName(url string) string {
