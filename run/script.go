@@ -2,6 +2,7 @@ package run
 
 import (
 	"bufio"
+	"context"
 	"io"
 	"log"
 	"os"
@@ -11,7 +12,7 @@ import (
 
 const ScriptName = ".git-builder.sh"
 
-func RunIfPresent(repoDir string) error {
+func RunIfPresent(ctx context.Context, repoDir string) error {
 	scriptPath := filepath.Join(repoDir, ScriptName)
 	if _, err := os.Stat(scriptPath); err != nil {
 		if os.IsNotExist(err) {
@@ -20,7 +21,7 @@ func RunIfPresent(repoDir string) error {
 		return err
 	}
 
-	cmd := exec.Command("sh", "-c", scriptPath)
+	cmd := exec.CommandContext(ctx, "sh", "-c", scriptPath)
 	cmd.Dir = repoDir
 	cmd.Env = os.Environ()
 

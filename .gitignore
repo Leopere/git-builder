@@ -1,1 +1,5 @@
 /git-builder
+/git-builder.pid
+/git-builder.state
+/dist
+/testdata/dummy-repo/.git

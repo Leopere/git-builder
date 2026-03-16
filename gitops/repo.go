@@ -9,6 +9,8 @@ import (
 	"git-builder/config"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/transport"
+	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 )
 
@@ -16,9 +18,16 @@ func Sync(c *config.Config, repoURL string) (localPath string, err error) {
 	dirName := repoDirName(repoURL)
 	localPath = filepath.Join(c.Workdir, dirName)
 
-	auth, err := ssh.NewPublicKeysFromFile("git", c.SSHKeyPath(), "")
-	if err != nil {
-		return "", fmt.Errorf("ssh key %s: %w", c.SSHKeyPath(), err)
+	var auth transport.AuthMethod
+	if strings.HasPrefix(repoURL, "https://") {
+		if token := c.GitHubToken(); token != "" {
+			auth = &http.BasicAuth{Username: "git", Password: token}
+		}
+	} else {
+		auth, err = ssh.NewPublicKeysFromFile("git", c.SSHKeyPath(), "")
+		if err != nil {
+			return "", fmt.Errorf("ssh key %s: %w", c.SSHKeyPath(), err)
+		}
 	}
 
 	if err := os.MkdirAll(c.Workdir, 0755); err != nil {

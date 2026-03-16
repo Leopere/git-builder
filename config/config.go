@@ -21,6 +21,7 @@ type Config struct {
 	PollIntervalSeconds int      `yaml:"poll_interval_seconds"`
 	Workdir             string   `yaml:"workdir"`
 	SSHKey              string   `yaml:"ssh_key"`
+	TokenFromConfig     string   `yaml:"github_token"`
 	Repos               []Repo   `yaml:"repos"`
 }
 
@@ -28,13 +29,19 @@ type Repo struct {
 	URL string `yaml:"url"`
 }
 
+// ResolvePath returns the config path used when path is empty (env or default).
+func ResolvePath(path string) string {
+	if path != "" {
+		return path
+	}
+	if p := os.Getenv("GIT_BUILDER_CONFIG"); p != "" {
+		return p
+	}
+	return DefaultConfigPath
+}
+
 func Load(path string) (*Config, error) {
-	if path == "" {
-		path = os.Getenv("GIT_BUILDER_CONFIG")
-	}
-	if path == "" {
-		path = DefaultConfigPath
-	}
+	path = ResolvePath(path)
 
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -68,4 +75,11 @@ func (c *Config) SSHKeyPath() string {
 		base = b
 	}
 	return filepath.Join(base, c.SSHKey)
+}
+
+func (c *Config) GitHubToken() string {
+	if t := os.Getenv("GIT_BUILDER_GITHUB_TOKEN"); t != "" {
+		return t
+	}
+	return c.TokenFromConfig
 }
