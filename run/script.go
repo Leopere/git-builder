@@ -12,12 +12,9 @@ import (
 
 const ScriptName = ".git-builder.sh"
 
-func RunIfPresent(ctx context.Context, repoDir string) error {
-	scriptPath := filepath.Join(repoDir, ScriptName)
-	if _, err := os.Stat(scriptPath); err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
+func RunIfPresent(ctx context.Context, repoDir, overridePath string) error {
+	scriptPath, err := chooseScriptPath(repoDir, overridePath)
+	if err != nil || scriptPath == "" {
 		return err
 	}
 
@@ -42,6 +39,22 @@ func RunIfPresent(ctx context.Context, repoDir string) error {
 	go logPipe("[git-builder stderr]", stderr)
 
 	return cmd.Wait()
+}
+
+func chooseScriptPath(repoDir, overridePath string) (string, error) {
+	if overridePath != "" {
+		if _, err := os.Stat(overridePath); err == nil {
+			return overridePath, nil
+		}
+	}
+	inRepo := filepath.Join(repoDir, ScriptName)
+	if _, err := os.Stat(inRepo); err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	return inRepo, nil
 }
 
 func logPipe(prefix string, r io.Reader) {

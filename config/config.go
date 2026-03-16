@@ -25,6 +25,7 @@ type Config struct {
 	TokenFromConfig     string `yaml:"github_token"`
 	MaxConcurrent       int    `yaml:"max_concurrent"`
 	Repos               []Repo `yaml:"repos"`
+	LocalOverrideDir    string `yaml:"local_override_dir"`
 }
 
 type Repo struct {
@@ -90,4 +91,12 @@ func (c *Config) GitHubToken() string {
 		return t
 	}
 	return c.TokenFromConfig
+}
+
+// OverrideScriptDir returns the directory for OWNER-REPO.sh override scripts (env GIT_BUILDER_OVERRIDE_DIR overrides config).
+func (c *Config) OverrideScriptDir() string {
+	if d := os.Getenv("GIT_BUILDER_OVERRIDE_DIR"); d != "" {
+		return d
+	}
+	return c.LocalOverrideDir
 }

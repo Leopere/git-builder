@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -83,7 +84,11 @@ func main() {
 				if !updated {
 					return
 				}
-				if err := run.RunIfPresent(context.Background(), localPath); err != nil {
+				overridePath := ""
+				if d := cfg.OverrideScriptDir(); d != "" {
+					overridePath = filepath.Join(d, gitops.OverrideScriptBasename(url)+".sh")
+				}
+				if err := run.RunIfPresent(context.Background(), localPath, overridePath); err != nil {
 					log.Printf("script failed %s: %v", url, err)
 				}
 			}()
@@ -131,13 +136,17 @@ func main() {
 				if !updated {
 					return
 				}
+				overridePath := ""
+				if d := cfg.OverrideScriptDir(); d != "" {
+					overridePath = filepath.Join(d, gitops.OverrideScriptBasename(url)+".sh")
+				}
 				ctx, cancel := context.WithCancel(context.Background())
 				jobMu.Lock()
 				activeJobs[url] = cancel
 				state := strings.Join(activeJobURLs(activeJobs), ",")
 				jobMu.Unlock()
 				_ = svc.WriteState(state)
-				if err := run.RunIfPresent(ctx, localPath); err != nil {
+				if err := run.RunIfPresent(ctx, localPath, overridePath); err != nil {
 					log.Printf("script failed %s: %v", url, err)
 				}
 				jobMu.Lock()

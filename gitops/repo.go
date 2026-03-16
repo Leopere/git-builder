@@ -78,3 +78,29 @@ func repoDirName(url string) string {
 	}
 	return url
 }
+
+// OverrideScriptBasename returns the basename (no .sh) for a local override script,
+// e.g. "Leopere-git-builder" from git@github.com:Leopere/git-builder.git or
+// https://github.com/Leopere/git-builder. Used for OWNER-REPO.sh override scripts.
+func OverrideScriptBasename(repoURL string) string {
+	repoURL = strings.TrimSuffix(repoURL, ".git")
+	var path string
+	if i := strings.Index(repoURL, "://"); i >= 0 {
+		path = repoURL[i+3:]
+		if j := strings.Index(path, "/"); j >= 0 {
+			path = path[j+1:]
+		}
+	} else if i := strings.Index(repoURL, ":"); i >= 0 {
+		path = repoURL[i+1:]
+	} else {
+		return repoDirName(repoURL)
+	}
+	parts := strings.Split(path, "/")
+	if len(parts) >= 2 {
+		return parts[len(parts)-2] + "-" + parts[len(parts)-1]
+	}
+	if len(parts) == 1 && parts[0] != "" {
+		return parts[0]
+	}
+	return repoDirName(repoURL)
+}

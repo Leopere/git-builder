@@ -35,7 +35,7 @@ Use finite, non-interactive commands only (no interactive prompts).
 - `main.go` — flags, daemon loop, parallel poll (`max_concurrent`), SIGUSR1/SIGUSR2 job state
 - `config/` — YAML config: `MaxConcurrent`, workdir, SSH key, token, repos
 - `gitops/` — sync (clone/pull)
-- `run/` — run `.git-builder.sh` in repo root
+- `run/` — run `.git-builder.sh` in repo root (or `local_override_dir`/`OWNER-REPO.sh` if set)
 - `svc/` — pid/state files, install/uninstall, ListJobs/KillJobs
 - Config example: `config.example.yaml`. Default config path: `GIT_BUILDER_CONFIG` or `/etc/git-builder/config.yaml`
 
