@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -60,23 +62,33 @@ func main() {
 	}
 
 	if *runOnce {
+		sem := make(chan struct{}, cfg.MaxConcurrent)
+		var wg sync.WaitGroup
 		for _, r := range cfg.Repos {
 			if r.URL == "" {
 				continue
 			}
-			log.Printf("sync %s", r.URL)
-			localPath, updated, err := gitops.Sync(cfg, r.URL)
-			if err != nil {
-				log.Printf("sync failed %s: %v", r.URL, err)
-				continue
-			}
-			if !updated {
-				continue
-			}
-			if err := run.RunIfPresent(context.Background(), localPath); err != nil {
-				log.Printf("script failed %s: %v", r.URL, err)
-			}
+			url := r.URL
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+				log.Printf("sync %s", url)
+				localPath, updated, err := gitops.Sync(cfg, url)
+				if err != nil {
+					log.Printf("sync failed %s: %v", url, err)
+					return
+				}
+				if !updated {
+					return
+				}
+				if err := run.RunIfPresent(context.Background(), localPath); err != nil {
+					log.Printf("script failed %s: %v", url, err)
+				}
+			}()
 		}
+		wg.Wait()
 		return
 	}
 
@@ -89,8 +101,8 @@ func main() {
 	}
 	defer svc.RemovePid()
 
-	var currentJob string
-	var cancel context.CancelFunc
+	var jobMu sync.Mutex
+	activeJobs := make(map[string]context.CancelFunc)
 	sigCh := make(chan os.Signal, 2)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT, svc.SIGUSR1, svc.SIGUSR2)
 
@@ -98,30 +110,48 @@ func main() {
 	defer tick.Stop()
 
 	doPoll := func() {
+		sem := make(chan struct{}, cfg.MaxConcurrent)
+		var wg sync.WaitGroup
 		for _, r := range cfg.Repos {
 			if r.URL == "" {
 				continue
 			}
-			log.Printf("sync %s", r.URL)
-			localPath, updated, err := gitops.Sync(cfg, r.URL)
-			if err != nil {
-				log.Printf("sync failed %s: %v", r.URL, err)
-				continue
-			}
-			if !updated {
-				continue
-			}
-			ctx, c := context.WithCancel(context.Background())
-			cancel = c
-			currentJob = r.URL
-			_ = svc.WriteState(currentJob)
-			if err := run.RunIfPresent(ctx, localPath); err != nil {
-				log.Printf("script failed %s: %v", r.URL, err)
-			}
-			cancel = nil
-			currentJob = ""
-			_ = svc.WriteState("idle")
+			url := r.URL
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+				log.Printf("sync %s", url)
+				localPath, updated, err := gitops.Sync(cfg, url)
+				if err != nil {
+					log.Printf("sync failed %s: %v", url, err)
+					return
+				}
+				if !updated {
+					return
+				}
+				ctx, cancel := context.WithCancel(context.Background())
+				jobMu.Lock()
+				activeJobs[url] = cancel
+				state := strings.Join(activeJobURLs(activeJobs), ",")
+				jobMu.Unlock()
+				_ = svc.WriteState(state)
+				if err := run.RunIfPresent(ctx, localPath); err != nil {
+					log.Printf("script failed %s: %v", url, err)
+				}
+				jobMu.Lock()
+				delete(activeJobs, url)
+				state = "idle"
+				if len(activeJobs) > 0 {
+					state = strings.Join(activeJobURLs(activeJobs), ",")
+				}
+				jobMu.Unlock()
+				cancel()
+				_ = svc.WriteState(state)
+			}()
 		}
+		wg.Wait()
 	}
 
 	_ = svc.WriteState("idle")
@@ -130,15 +160,21 @@ func main() {
 		select {
 		case sig := <-sigCh:
 			if sig == svc.SIGUSR1 {
-				if currentJob != "" {
-					_ = svc.WriteState(currentJob)
-				} else {
-					_ = svc.WriteState("idle")
+				jobMu.Lock()
+				state := "idle"
+				if len(activeJobs) > 0 {
+					state = strings.Join(activeJobURLs(activeJobs), ",")
 				}
+				jobMu.Unlock()
+				_ = svc.WriteState(state)
 				continue
 			}
-			if sig == svc.SIGUSR2 && cancel != nil {
-				cancel()
+			if sig == svc.SIGUSR2 {
+				jobMu.Lock()
+				for _, c := range activeJobs {
+					c()
+				}
+				jobMu.Unlock()
 				continue
 			}
 			log.Print("shutting down")
@@ -154,4 +190,12 @@ func main() {
 			doPoll()
 		}
 	}
+}
+
+func activeJobURLs(jobs map[string]context.CancelFunc) []string {
+	urls := make([]string, 0, len(jobs))
+	for u := range jobs {
+		urls = append(urls, u)
+	}
+	return urls
 }

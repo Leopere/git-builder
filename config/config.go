@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"gopkg.in/yaml.v3"
 )
@@ -18,11 +19,12 @@ const (
 )
 
 type Config struct {
-	PollIntervalSeconds int      `yaml:"poll_interval_seconds"`
-	Workdir             string   `yaml:"workdir"`
-	SSHKey              string   `yaml:"ssh_key"`
-	TokenFromConfig     string   `yaml:"github_token"`
-	Repos               []Repo   `yaml:"repos"`
+	PollIntervalSeconds int    `yaml:"poll_interval_seconds"`
+	Workdir             string `yaml:"workdir"`
+	SSHKey              string `yaml:"ssh_key"`
+	TokenFromConfig     string `yaml:"github_token"`
+	MaxConcurrent       int    `yaml:"max_concurrent"`
+	Repos               []Repo `yaml:"repos"`
 }
 
 type Repo struct {
@@ -64,6 +66,12 @@ func Load(path string) (*Config, error) {
 	}
 	if c.SSHKey == "" {
 		c.SSHKey = DefaultSSHKey
+	}
+	if c.MaxConcurrent <= 0 {
+		c.MaxConcurrent = runtime.NumCPU()
+	}
+	if c.MaxConcurrent <= 0 {
+		c.MaxConcurrent = 1
 	}
 
 	return &c, nil
