@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"flag"
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -20,8 +22,21 @@ import (
 
 const attributionURL = "https://colinknapp.com?utm_source=cli&utm_medium=banner&utm_campaign=git-builder"
 
+// lineFlushWriter flushes after each write that contains a newline so output appears in real time (e.g. over SSH).
+type lineFlushWriter struct{ w io.Writer }
+
+func (f *lineFlushWriter) Write(p []byte) (n int, err error) {
+	n, err = f.w.Write(p)
+	if err == nil && bytes.Contains(p, []byte{'\n'}) {
+		if file, ok := f.w.(*os.File); ok {
+			_ = file.Sync()
+		}
+	}
+	return n, err
+}
+
 func main() {
-	log.SetOutput(os.Stdout)
+	log.SetOutput(&lineFlushWriter{w: os.Stdout})
 	log.SetFlags(log.LstdFlags)
 
 	doInstall := flag.Bool("install", false, "install and start service (use 'go run . -install' for install-from-source)")
@@ -29,6 +44,7 @@ func main() {
 	listJobs := flag.Bool("listjobs", false, "print current job (or idle) from running daemon")
 	killJobs := flag.Bool("killjobs", false, "signal daemon to cancel current job")
 	runOnce := flag.Bool("run-once", false, "run one poll cycle then exit (for on-demand or testing)")
+	triggerURL := flag.String("trigger", "", "sync and run script for this repo URL once then exit")
 	flag.Parse()
 
 	if *doInstall {
@@ -95,6 +111,35 @@ func main() {
 			}()
 		}
 		wg.Wait()
+		return
+	}
+
+	if *triggerURL != "" {
+		var found bool
+		for _, r := range cfg.Repos {
+			if r.URL == *triggerURL {
+				found = true
+				break
+			}
+		}
+		if !found {
+			log.Fatalf("trigger: repo %q not in config", *triggerURL)
+		}
+		log.Printf("trigger: syncing %s", *triggerURL)
+		localPath, _, err := gitops.Sync(cfg, *triggerURL)
+		if err != nil {
+			log.Fatalf("trigger: sync failed %s: %v", *triggerURL, err)
+		}
+		overridePath := ""
+		if d := cfg.OverrideScriptDir(); d != "" {
+			overridePath = filepath.Join(d, gitops.OverrideScriptBasename(*triggerURL)+".sh")
+		}
+		log.Printf("trigger: running script (repo=%s)", localPath)
+		scriptEnv := scriptEnvFromConfig(cfg)
+		if err := run.RunIfPresent(context.Background(), localPath, overridePath, scriptEnv); err != nil {
+			log.Fatalf("trigger: script failed %s: %v", *triggerURL, err)
+		}
+		log.Printf("trigger: done %s", *triggerURL)
 		return
 	}
 

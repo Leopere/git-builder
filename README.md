@@ -61,6 +61,18 @@ git-builder --run-once
 
 Syncs all repos and runs `.git-builder.sh` only in repos that were just cloned or had new commits pulled.
 
+**Manual trigger (one repo):**
+
+```bash
+git-builder --trigger <url>
+```
+
+Syncs that repo and runs its build script once, then exits. The repo must be listed in config. Use after a deploy to run the build on demand, e.g.:
+
+```bash
+ssh app.a250.ca 'sudo git-builder --trigger https://github.com/Leopere/rfetcher.git'
+```
+
 **Install / uninstall service:**
 
 ```bash
