@@ -45,4 +45,12 @@ GitHub Actions (`.github/workflows/build-release.yml`): push to `main` → test,
 
 ## MCP
 
-Project root `mcp.json` registers the GitHub MCP server so agents can work with releases, issues, and PRs. Set `GITHUB_PERSONAL_ACCESS_TOKEN` in the environment when using GitHub MCP tools.
+MCP (Model Context Protocol) config for this project lives in **`.cursor/mcp.json`**. Cursor and Cloud Agents load that file automatically. It registers the **GitHub MCP server** so agents can work with releases, issues, and PRs.
+
+**What you need to use MCP in this repo:**
+
+- **Node/npx** — the GitHub server is run via `npx -y @modelcontextprotocol/server-github`.
+- **Cursor** (or another MCP client) — project config is read from `.cursor/mcp.json`.
+- **GitHub token** — set `GITHUB_PERSONAL_ACCESS_TOKEN` in your environment (e.g. in your shell profile or launch env). Do not put the token in `mcp.json` or any committed file. Restart Cursor after changing the variable so the MCP server sees it.
+
+For full “how to operate this project” (build, test, release, and MCP), this file (AGENT.md) is the single place to look.
