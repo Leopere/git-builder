@@ -17,6 +17,12 @@ ssh_key: id_ed25519
 # https://github.com/settings/personal-access-tokens/new?name=git-builder&description=Clone+and+pull+repos+over+HTTPS&contents=read
 # github_token: <token>
 
+# Optional: env vars passed to the build script. Keys are variable names, values are secret.
+# script_env:
+#   GHCR_TOKEN: <token>   # e.g. for docker login ghcr.io
+# Shorthand: ghcr_token sets GHCR_TOKEN if not in script_env.
+# ghcr_token: <token>
+
 # Max repos building at once (sync+script). Default: number of CPUs; min 1.
 # max_concurrent: 4
 

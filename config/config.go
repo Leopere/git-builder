@@ -19,13 +19,15 @@ const (
 )
 
 type Config struct {
-	PollIntervalSeconds int    `yaml:"poll_interval_seconds"`
-	Workdir             string `yaml:"workdir"`
-	SSHKey              string `yaml:"ssh_key"`
-	TokenFromConfig     string `yaml:"github_token"`
-	MaxConcurrent       int    `yaml:"max_concurrent"`
-	Repos               []Repo `yaml:"repos"`
-	LocalOverrideDir    string `yaml:"local_override_dir"`
+	PollIntervalSeconds int               `yaml:"poll_interval_seconds"`
+	Workdir             string            `yaml:"workdir"`
+	SSHKey              string            `yaml:"ssh_key"`
+	TokenFromConfig     string            `yaml:"github_token"`
+	GhcrToken           string            `yaml:"ghcr_token"`
+	ScriptEnv           map[string]string `yaml:"script_env"`
+	MaxConcurrent       int               `yaml:"max_concurrent"`
+	Repos               []Repo            `yaml:"repos"`
+	LocalOverrideDir    string            `yaml:"local_override_dir"`
 }
 
 type Repo struct {

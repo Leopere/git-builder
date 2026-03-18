@@ -12,7 +12,7 @@ import (
 
 const ScriptName = ".git-builder.sh"
 
-func RunIfPresent(ctx context.Context, repoDir, overridePath string) error {
+func RunIfPresent(ctx context.Context, repoDir, overridePath string, extraEnv map[string]string) error {
 	scriptPath, err := chooseScriptPath(repoDir, overridePath)
 	if err != nil || scriptPath == "" {
 		return err
@@ -20,7 +20,7 @@ func RunIfPresent(ctx context.Context, repoDir, overridePath string) error {
 
 	cmd := exec.CommandContext(ctx, "sh", "-c", scriptPath)
 	cmd.Dir = repoDir
-	cmd.Env = os.Environ()
+	cmd.Env = appendEnviron(os.Environ(), extraEnv)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -39,6 +39,18 @@ func RunIfPresent(ctx context.Context, repoDir, overridePath string) error {
 	go logPipe("[git-builder stderr]", stderr)
 
 	return cmd.Wait()
+}
+
+func appendEnviron(base []string, extra map[string]string) []string {
+	if len(extra) == 0 {
+		return base
+	}
+	env := make([]string, len(base), len(base)+len(extra))
+	copy(env, base)
+	for k, v := range extra {
+		env = append(env, k+"="+v)
+	}
+	return env
 }
 
 func chooseScriptPath(repoDir, overridePath string) (string, error) {

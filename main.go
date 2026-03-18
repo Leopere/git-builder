@@ -88,7 +88,8 @@ func main() {
 				if d := cfg.OverrideScriptDir(); d != "" {
 					overridePath = filepath.Join(d, gitops.OverrideScriptBasename(url)+".sh")
 				}
-				if err := run.RunIfPresent(context.Background(), localPath, overridePath); err != nil {
+				scriptEnv := scriptEnvFromConfig(cfg)
+				if err := run.RunIfPresent(context.Background(), localPath, overridePath, scriptEnv); err != nil {
 					log.Printf("script failed %s: %v", url, err)
 				}
 			}()
@@ -140,13 +141,14 @@ func main() {
 				if d := cfg.OverrideScriptDir(); d != "" {
 					overridePath = filepath.Join(d, gitops.OverrideScriptBasename(url)+".sh")
 				}
+				scriptEnv := scriptEnvFromConfig(cfg)
 				ctx, cancel := context.WithCancel(context.Background())
 				jobMu.Lock()
 				activeJobs[url] = cancel
 				state := strings.Join(activeJobURLs(activeJobs), ",")
 				jobMu.Unlock()
 				_ = svc.WriteState(state)
-				if err := run.RunIfPresent(ctx, localPath, overridePath); err != nil {
+				if err := run.RunIfPresent(ctx, localPath, overridePath, scriptEnv); err != nil {
 					log.Printf("script failed %s: %v", url, err)
 				}
 				jobMu.Lock()
@@ -207,4 +209,18 @@ func activeJobURLs(jobs map[string]context.CancelFunc) []string {
 		urls = append(urls, u)
 	}
 	return urls
+}
+
+func scriptEnvFromConfig(cfg *config.Config) map[string]string {
+	out := make(map[string]string)
+	for k, v := range cfg.ScriptEnv {
+		out[k] = v
+	}
+	if cfg.GhcrToken != "" && out["GHCR_TOKEN"] == "" {
+		out["GHCR_TOKEN"] = cfg.GhcrToken
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }

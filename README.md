@@ -33,6 +33,8 @@ Configuration is read exclusively from the YAML file; no environment variables a
 - `workdir` — Where to clone repos (e.g. `/var/lib/git-builder/repos`). If unwritable, falls back to `repos` next to the binary.
 - `ssh_key` — SSH key filename under `/etc/git-builder` (e.g. `id_ed25519`). System default `~/.ssh` keys are tried if not set there.
 - `github_token` — Optional; for HTTPS repos. Set in the YAML config file.
+- `script_env` — Optional map of env vars passed to the build script (e.g. `GHCR_TOKEN` for `docker login ghcr.io`). Keys are variable names.
+- `ghcr_token` — Optional shorthand; sets `GHCR_TOKEN` in script env if not already in `script_env`.
 - `repos` — List of `url` entries (SSH or HTTPS). Example: `git@github.com:user/repo.git` or `https://github.com/user/repo.git`.
 - `local_override_dir` — Optional. Directory for host-local scripts named `OWNER-REPO.sh` (e.g. `Leopere-git-builder.sh`). If set and a matching file exists, it is run instead of the repo's `.git-builder.sh`, still with the repo clone as working directory.
 
