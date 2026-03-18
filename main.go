@@ -136,7 +136,7 @@ func main() {
 		}
 		log.Printf("trigger: running script (repo=%s)", localPath)
 		scriptEnv := scriptEnvFromConfig(cfg)
-		if err := run.RunIfPresent(context.Background(), localPath, overridePath, scriptEnv); err != nil {
+		if err := run.RunIfPresentWithStdio(context.Background(), localPath, overridePath, scriptEnv, os.Stdout, os.Stderr); err != nil {
 			log.Fatalf("trigger: script failed %s: %v", *triggerURL, err)
 		}
 		log.Printf("trigger: done %s", *triggerURL)

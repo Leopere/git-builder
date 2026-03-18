@@ -41,6 +41,40 @@ func RunIfPresent(ctx context.Context, repoDir, overridePath string, extraEnv ma
 	return cmd.Wait()
 }
 
+// RunIfPresentWithStdio runs the script if present. If stdout != nil, script stdout/stderr
+// are connected directly to the given writers (passthrough). Otherwise behaves like RunIfPresent (pipes + log).
+func RunIfPresentWithStdio(ctx context.Context, repoDir, overridePath string, extraEnv map[string]string, stdout, stderr io.Writer) error {
+	scriptPath, err := chooseScriptPath(repoDir, overridePath)
+	if err != nil || scriptPath == "" {
+		return err
+	}
+
+	cmd := exec.CommandContext(ctx, "sh", "-c", scriptPath)
+	cmd.Dir = repoDir
+	cmd.Env = appendEnviron(os.Environ(), extraEnv)
+
+	if stdout != nil && stderr != nil {
+		cmd.Stdout = stdout
+		cmd.Stderr = stderr
+		return cmd.Run()
+	}
+
+	pipeOut, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	pipeErr, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	go logPipe("[git-builder stdout]", pipeOut)
+	go logPipe("[git-builder stderr]", pipeErr)
+	return cmd.Wait()
+}
+
 func appendEnviron(base []string, extra map[string]string) []string {
 	if len(extra) == 0 {
 		return base
