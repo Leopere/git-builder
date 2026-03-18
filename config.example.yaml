@@ -12,7 +12,7 @@ workdir: /var/lib/git-builder/repos
 # SSH key filename under /etc/git-builder (e.g. id_ed25519 or id_rsa).
 ssh_key: id_ed25519
 
-# Optional: GitHub token for HTTPS repos. Prefer env GIT_BUILDER_GITHUB_TOKEN.
+# Optional: GitHub token for HTTPS repos (set in YAML only).
 # Fine-grained token with only Contents read (clone/pull): 
 # https://github.com/settings/personal-access-tokens/new?name=git-builder&description=Clone+and+pull+repos+over+HTTPS&contents=read
 # github_token: <token>

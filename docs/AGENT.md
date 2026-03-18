@@ -11,7 +11,7 @@ A Go CLI daemon that polls configured git repositories (clone or pull with depth
 - **From a release:** Download the binary for the target OS/arch from [Releases](https://github.com/Leopere/git-builder/releases) and put it on `PATH` (e.g. `~/.local/bin` or `/usr/local/bin`).
 - **From source:** `git clone` this repo, then `go build -o git-builder .` or `make build`. Then run `./git-builder --install` to install and start the service (optional).
 
-Config: copy `config.example.yaml` to the config path (env `GIT_BUILDER_CONFIG` or default `/etc/git-builder/config.yaml`) and set `workdir`, `repos`, and optionally `ssh_key` or `github_token` / `GIT_BUILDER_GITHUB_TOKEN`.
+Config: copy `config.example.yaml` to the config path (default `/etc/git-builder/config.yaml`) and set `workdir`, `repos`, and optionally `ssh_key` or `github_token` in the YAML. All configuration and secrets are exclusively in the YAML file; no environment variables are used.
 
 ## Commands (for agents working in this repo)
 
@@ -37,7 +37,7 @@ Use finite, non-interactive commands only (no interactive prompts).
 - `gitops/` — sync (clone/pull)
 - `run/` — run `.git-builder.sh` in repo root (or `local_override_dir`/`OWNER-REPO.sh` if set)
 - `svc/` — pid/state files, install/uninstall, ListJobs/KillJobs
-- Config example: `config.example.yaml`. Default config path: `GIT_BUILDER_CONFIG` or `/etc/git-builder/config.yaml`
+- Config example: `config.example.yaml`. Default config path: `/etc/git-builder/config.yaml` (no env overrides)
 
 ## CI
 
@@ -51,6 +51,6 @@ MCP (Model Context Protocol) config for this project lives in **`.cursor/mcp.jso
 
 - **Node/npx** — the GitHub server is run via `npx -y @modelcontextprotocol/server-github`.
 - **Cursor** (or another MCP client) — project config is read from `.cursor/mcp.json`.
-- **GitHub token** — set `GITHUB_PERSONAL_ACCESS_TOKEN` in your environment (e.g. in your shell profile or launch env). Do not put the token in `mcp.json` or any committed file. Restart Cursor after changing the variable so the MCP server sees it.
+- **GitHub token** — set `GITHUB_PERSONAL_ACCESS_TOKEN` in your environment (e.g. in your shell profile or launch env). Do not put the token in `mcp.json` or any committed file. Restart Cursor after changing the variable so the MCP server sees it. Git-builder itself does not use environment variables; its config is YAML-only.
 
 For full “how to operate this project” (build, test, release, and MCP), this file (AGENT.md) is the single place to look.

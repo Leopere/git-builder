@@ -23,32 +23,20 @@ go build -o git-builder .
 
 Copy [config.example.yaml](config.example.yaml) to your config location and edit.
 
-**Config path (first found wins):**
+**Config path:** `/etc/git-builder/config.yaml` (no environment overrides).
 
-- Env: `GIT_BUILDER_CONFIG`
-- Default: `/etc/git-builder/config.yaml`
-- Fallback: `config.yaml` next to the binary
-
-**Environment variables:**
-
-| Variable | Purpose |
-|----------|---------|
-| `GIT_BUILDER_CONFIG` | Path to config file |
-| `GIT_BUILDER_KEY_DIR` | Directory for SSH key (default `/etc/git-builder`) |
-| `GIT_BUILDER_GITHUB_TOKEN` | Token for HTTPS repos (overrides `github_token` in config) |
-| `GIT_BUILDER_OVERRIDE_DIR` | Directory for OWNER-REPO.sh override scripts (overrides `local_override_dir` in config) |
-| `GIT_BUILDER_RUNDIR` | Directory for pid/state files (default: directory of the binary) |
+Configuration is read exclusively from the YAML file; no environment variables are used.
 
 **Config fields:**
 
 - `poll_interval_seconds` — How often to poll all repos (default 60, min 60, recommended 300).
 - `workdir` — Where to clone repos (e.g. `/var/lib/git-builder/repos`). If unwritable, falls back to `repos` next to the binary.
-- `ssh_key` — SSH key filename under `GIT_BUILDER_KEY_DIR` or `/etc/git-builder` (e.g. `id_ed25519`). System default `~/.ssh` keys are tried if not set there.
-- `github_token` — Optional; for HTTPS repos. Prefer setting `GIT_BUILDER_GITHUB_TOKEN` so the token is not in the config file.
+- `ssh_key` — SSH key filename under `/etc/git-builder` (e.g. `id_ed25519`). System default `~/.ssh` keys are tried if not set there.
+- `github_token` — Optional; for HTTPS repos. Set in the YAML config file.
 - `repos` — List of `url` entries (SSH or HTTPS). Example: `git@github.com:user/repo.git` or `https://github.com/user/repo.git`.
 - `local_override_dir` — Optional. Directory for host-local scripts named `OWNER-REPO.sh` (e.g. `Leopere-git-builder.sh`). If set and a matching file exists, it is run instead of the repo's `.git-builder.sh`, still with the repo clone as working directory.
 
-**Local override scripts:** When `local_override_dir` (or `GIT_BUILDER_OVERRIDE_DIR`) is set, git-builder looks for a file named `OWNER-REPO.sh` in that directory (e.g. `Leopere-git-builder.sh` for `git@github.com:Leopere/git-builder.git`). If present, that script is run instead of the repo's `.git-builder.sh`, so the host can define build steps that are triggered by repo updates but not stored in the repo.
+**Local override scripts:** When `local_override_dir` is set, git-builder looks for a file named `OWNER-REPO.sh` in that directory (e.g. `Leopere-git-builder.sh` for `git@github.com:Leopere/git-builder.git`). If present, that script is run instead of the repo's `.git-builder.sh`, so the host can define build steps that are triggered by repo updates but not stored in the repo.
 
 **GitHub token (HTTPS):** Create a fine-grained token with **Contents: Read** only:  
 [https://github.com/settings/personal-access-tokens/new?name=git-builder&description=Clone+and+pull+repos+over+HTTPS&contents=read](https://github.com/settings/personal-access-tokens/new?name=git-builder&description=Clone+and+pull+repos+over+HTTPS&contents=read)
@@ -90,7 +78,7 @@ git-builder --killjobs   # cancel current script run
 - Polls each configured repo on an interval (clone if missing, pull with depth 1 if present).
 - **Script:** In each repo root, looks for `.git-builder.sh` (or a local override `OWNER-REPO.sh` in `local_override_dir` if set). Runs it only when the repo was **updated** (new clone or pull fetched new commits). Script stdout/stderr are logged.
 - **Depth:** Clone and pull use depth 1 (shallow).
-- **Auth:** SSH repos use the configured key (or system default); HTTPS repos use `GIT_BUILDER_GITHUB_TOKEN` or `github_token` in config.
+- **Auth:** SSH repos use the configured key (or system default); HTTPS repos use `github_token` in config.
 
 ## CI/CD
 

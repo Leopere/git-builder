@@ -7,9 +7,6 @@ import (
 )
 
 func RunDir() string {
-	if d := os.Getenv("GIT_BUILDER_RUNDIR"); d != "" {
-		return d
-	}
 	if runtime.GOOS == "darwin" {
 		if home, err := os.UserHomeDir(); err == nil {
 			return filepath.Join(home, ".local", "var", "run", "git-builder")

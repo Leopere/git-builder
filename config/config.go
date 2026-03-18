@@ -32,13 +32,10 @@ type Repo struct {
 	URL string `yaml:"url"`
 }
 
-// ResolvePath returns the config path used when path is empty (env or default).
+// ResolvePath returns the config path when path is empty (default path).
 func ResolvePath(path string) string {
 	if path != "" {
 		return path
-	}
-	if p := os.Getenv("GIT_BUILDER_CONFIG"); p != "" {
-		return p
 	}
 	return DefaultConfigPath
 }
@@ -80,23 +77,14 @@ func Load(path string) (*Config, error) {
 
 func (c *Config) SSHKeyPath() string {
 	base := "/etc/git-builder"
-	if b := os.Getenv("GIT_BUILDER_KEY_DIR"); b != "" {
-		base = b
-	}
 	return filepath.Join(base, c.SSHKey)
 }
 
 func (c *Config) GitHubToken() string {
-	if t := os.Getenv("GIT_BUILDER_GITHUB_TOKEN"); t != "" {
-		return t
-	}
 	return c.TokenFromConfig
 }
 
-// OverrideScriptDir returns the directory for OWNER-REPO.sh override scripts (env GIT_BUILDER_OVERRIDE_DIR overrides config).
+// OverrideScriptDir returns the directory for OWNER-REPO.sh override scripts.
 func (c *Config) OverrideScriptDir() string {
-	if d := os.Getenv("GIT_BUILDER_OVERRIDE_DIR"); d != "" {
-		return d
-	}
 	return c.LocalOverrideDir
 }
