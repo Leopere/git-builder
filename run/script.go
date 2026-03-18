@@ -12,10 +12,15 @@ import (
 
 const ScriptName = ".git-builder.sh"
 
-func RunIfPresent(ctx context.Context, repoDir, overridePath string, extraEnv map[string]string) error {
+// RunIfPresent runs the script if present. Returns (true, nil) if script ran successfully,
+// (true, err) if script ran and failed, (false, nil) if no script present, (false, err) on path error.
+func RunIfPresent(ctx context.Context, repoDir, overridePath string, extraEnv map[string]string) (ran bool, err error) {
 	scriptPath, err := chooseScriptPath(repoDir, overridePath)
-	if err != nil || scriptPath == "" {
-		return err
+	if err != nil {
+		return false, err
+	}
+	if scriptPath == "" {
+		return false, nil
 	}
 
 	cmd := exec.CommandContext(ctx, "sh", "-c", scriptPath)
@@ -24,29 +29,33 @@ func RunIfPresent(ctx context.Context, repoDir, overridePath string, extraEnv ma
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return err
+		return false, err
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	if err := cmd.Start(); err != nil {
-		return err
+		return false, err
 	}
 
 	go logPipe("[git-builder stdout]", stdout)
 	go logPipe("[git-builder stderr]", stderr)
 
-	return cmd.Wait()
+	return true, cmd.Wait()
 }
 
-// RunIfPresentWithStdio runs the script if present. If stdout != nil, script stdout/stderr
-// are connected directly to the given writers (passthrough). Otherwise behaves like RunIfPresent (pipes + log).
-func RunIfPresentWithStdio(ctx context.Context, repoDir, overridePath string, extraEnv map[string]string, stdout, stderr io.Writer) error {
+// RunIfPresentWithStdio runs the script if present. Returns (true, nil) if script ran successfully,
+// (true, err) if script ran and failed, (false, nil) if no script present. If stdout != nil, script
+// stdout/stderr are connected directly to the given writers (passthrough).
+func RunIfPresentWithStdio(ctx context.Context, repoDir, overridePath string, extraEnv map[string]string, stdout, stderr io.Writer) (ran bool, err error) {
 	scriptPath, err := chooseScriptPath(repoDir, overridePath)
-	if err != nil || scriptPath == "" {
-		return err
+	if err != nil {
+		return false, err
+	}
+	if scriptPath == "" {
+		return false, nil
 	}
 
 	cmd := exec.CommandContext(ctx, "sh", "-c", scriptPath)
@@ -56,23 +65,23 @@ func RunIfPresentWithStdio(ctx context.Context, repoDir, overridePath string, ex
 	if stdout != nil && stderr != nil {
 		cmd.Stdout = stdout
 		cmd.Stderr = stderr
-		return cmd.Run()
+		return true, cmd.Run()
 	}
 
 	pipeOut, err := cmd.StdoutPipe()
 	if err != nil {
-		return err
+		return false, err
 	}
 	pipeErr, err := cmd.StderrPipe()
 	if err != nil {
-		return err
+		return false, err
 	}
 	if err := cmd.Start(); err != nil {
-		return err
+		return false, err
 	}
 	go logPipe("[git-builder stdout]", pipeOut)
 	go logPipe("[git-builder stderr]", pipeErr)
-	return cmd.Wait()
+	return true, cmd.Wait()
 }
 
 func appendEnviron(base []string, extra map[string]string) []string {

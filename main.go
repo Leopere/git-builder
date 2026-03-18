@@ -97,6 +97,11 @@ func main() {
 					log.Printf("sync failed %s: %v", url, err)
 					return
 				}
+				if updated {
+					log.Printf("sync succeeded %s (repo updated)", url)
+				} else {
+					log.Printf("sync succeeded %s (already up to date)", url)
+				}
 				if !updated {
 					return
 				}
@@ -105,8 +110,13 @@ func main() {
 					overridePath = filepath.Join(d, gitops.OverrideScriptBasename(url)+".sh")
 				}
 				scriptEnv := scriptEnvFromConfig(cfg)
-				if err := run.RunIfPresent(context.Background(), localPath, overridePath, scriptEnv); err != nil {
+				ran, err := run.RunIfPresent(context.Background(), localPath, overridePath, scriptEnv)
+				if err != nil {
 					log.Printf("script failed %s: %v", url, err)
+				} else if ran {
+					log.Printf("script completed successfully %s", url)
+				} else {
+					log.Printf("no script to run %s", url)
 				}
 			}()
 		}
@@ -126,9 +136,14 @@ func main() {
 			log.Fatalf("trigger: repo %q not in config", *triggerURL)
 		}
 		log.Printf("trigger: syncing %s", *triggerURL)
-		localPath, _, err := gitops.Sync(cfg, *triggerURL)
+		localPath, updated, err := gitops.Sync(cfg, *triggerURL)
 		if err != nil {
 			log.Fatalf("trigger: sync failed %s: %v", *triggerURL, err)
+		}
+		if updated {
+			log.Printf("trigger: sync succeeded %s (repo updated)", *triggerURL)
+		} else {
+			log.Printf("trigger: sync succeeded %s (already up to date)", *triggerURL)
 		}
 		overridePath := ""
 		if d := cfg.OverrideScriptDir(); d != "" {
@@ -136,10 +151,16 @@ func main() {
 		}
 		log.Printf("trigger: running script (repo=%s)", localPath)
 		scriptEnv := scriptEnvFromConfig(cfg)
-		if err := run.RunIfPresentWithStdio(context.Background(), localPath, overridePath, scriptEnv, os.Stdout, os.Stderr); err != nil {
+		log.Printf("trigger: passing %d script env vars", len(scriptEnv))
+		ran, err := run.RunIfPresentWithStdio(context.Background(), localPath, overridePath, scriptEnv, os.Stdout, os.Stderr)
+		if err != nil {
 			log.Fatalf("trigger: script failed %s: %v", *triggerURL, err)
 		}
-		log.Printf("trigger: done %s", *triggerURL)
+		if ran {
+			log.Printf("trigger: script completed successfully, done %s", *triggerURL)
+		} else {
+			log.Printf("trigger: no script to run, done %s", *triggerURL)
+		}
 		return
 	}
 
@@ -179,6 +200,11 @@ func main() {
 					log.Printf("sync failed %s: %v", url, err)
 					return
 				}
+				if updated {
+					log.Printf("sync succeeded %s (repo updated)", url)
+				} else {
+					log.Printf("sync succeeded %s (already up to date)", url)
+				}
 				if !updated {
 					return
 				}
@@ -193,8 +219,13 @@ func main() {
 				state := strings.Join(activeJobURLs(activeJobs), ",")
 				jobMu.Unlock()
 				_ = svc.WriteState(state)
-				if err := run.RunIfPresent(ctx, localPath, overridePath, scriptEnv); err != nil {
+				ran, err := run.RunIfPresent(ctx, localPath, overridePath, scriptEnv)
+				if err != nil {
 					log.Printf("script failed %s: %v", url, err)
+				} else if ran {
+					log.Printf("script completed successfully %s", url)
+				} else {
+					log.Printf("no script to run %s", url)
 				}
 				jobMu.Lock()
 				delete(activeJobs, url)
@@ -259,10 +290,15 @@ func activeJobURLs(jobs map[string]context.CancelFunc) []string {
 func scriptEnvFromConfig(cfg *config.Config) map[string]string {
 	out := make(map[string]string)
 	for k, v := range cfg.ScriptEnv {
-		out[k] = v
+		if s := strings.TrimSpace(v); s != "" {
+			out[k] = s
+		}
 	}
-	if cfg.GhcrToken != "" && out["GHCR_TOKEN"] == "" {
-		out["GHCR_TOKEN"] = cfg.GhcrToken
+	for _, token := range []string{strings.TrimSpace(cfg.GhcrToken), strings.TrimSpace(cfg.GhcrTokenAlt)} {
+		if token != "" && out["GHCR_TOKEN"] == "" {
+			out["GHCR_TOKEN"] = token
+			break
+		}
 	}
 	if len(out) == 0 {
 		return nil
