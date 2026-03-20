@@ -134,13 +134,21 @@ make build
 go test ./...
 ```
 
-**Local multi-arch release (all targets, then create release with gh):**
+**Publish:** convenience wrapper; runs **`./ship.sh`** with your `-m` / `--host` (defaults in [`publish.sh`](publish.sh)). **`ship.sh`** still owns git and calling **`release.sh`**.
 
 ```bash
-./release.sh v0.1.3
+./publish.sh -m "your message" [--host app.a250.ca]
 ```
 
-Requires [gh](https://cli.github.com/) and a tag argument (or it generates a timestamped tag).
+- If you have local changes, `-m` is required. If the tree is clean, you can omit `-m`.
+- **Direct:** `./ship.sh "message" [--host …]` is the same pipeline without publish’s flag parsing.
+- **Deploy only** (no git): `./release.sh --host app.a250.ca`
+
+**Local multi-arch GitHub release (requires [gh](https://cli.github.com/)):**
+
+```bash
+./release.sh --gh v0.1.3
+```
 
 **For agents:** See [docs/AGENT.md](docs/AGENT.md) for install, use, and repo conventions. MCP config lives in [.cursor/mcp.json](.cursor/mcp.json); see AGENT.md for prerequisites and token setup.
 

@@ -19,8 +19,9 @@ Use finite, non-interactive commands only (no interactive prompts).
 
 - **Build:** `go build -o git-builder .` or `make build`
 - **Test:** `go test ./... -count=1 -timeout=60s`
-- **Release (local):** `./release.sh <tag>` (e.g. `./release.sh v0.1.4`) — requires `gh`; builds 10 OS/arch binaries and runs `gh release create`
-- **Ship:** Commit changes, then `git push origin main`. For a versioned release: `git tag v0.1.4 && git push origin v0.1.4`
+- **Release (local, GitHub):** `./release.sh --gh v0.1.4` — requires `gh`; builds multi-arch binaries and runs `gh release create`
+- **Publish:** `./publish.sh -m "msg" [--host app.a250.ca]` — invokes **`./ship.sh`** (ship calls **`./release.sh`**). Same pipeline: `./ship.sh "msg" [...]`. Deploy only: `./release.sh --host <host>`
+- **Deploy binary only:** `./release.sh --host <host>` (no git)
 - **Manual trigger:** `git-builder --trigger <url>` — sync and run the build script for one configured repo once, then exit (e.g. after deploy: `ssh app.a250.ca 'sudo git-builder --trigger https://github.com/Leopere/rfetcher.git'`)
 
 ## Repo conventions
