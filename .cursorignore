@@ -1,0 +1,7 @@
+# CI and release automation — edit deliberately outside Cursor context
+.github/
+.git-builder.sh
+build.sh
+publish.sh
+release.sh
+ship.sh
