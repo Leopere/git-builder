@@ -11,7 +11,7 @@ A Go CLI daemon that polls configured git repositories (clone or pull with depth
 - **From a release:** Download the binary for the target OS/arch from [Releases](https://github.com/Leopere/git-builder/releases) and put it on `PATH` (e.g. `~/.local/bin` or `/usr/local/bin`).
 - **From source:** `git clone` this repo, then `go build -o git-builder .` or `make build`. Then run `./git-builder --install` to install and start the service (optional).
 
-Config: copy `config.example.yaml` to the config path (default `/etc/git-builder/config.yaml`) and set `workdir`, `repos`, and optionally `ssh_key` or `github_token` in the YAML. All configuration and secrets are exclusively in the YAML file.
+Config: copy `config.example.yaml` to `/etc/git-builder/config.yaml`. Set `workdir`, `repos`; optionally `github_token` (HTTPS), `ghcr_token`/`ghcr_user` (GHCR pull), `script_env`, `local_override_dir`. All config is YAML only.
 
 ## Commands (for agents working in this repo)
 

@@ -14,10 +14,51 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 )
 
+// discardLocalWorktree resets tracked files to HEAD and removes untracked files (git clean -fd),
+// so pulls never fail with "worktree contains unstaged changes" on automation hosts.
+func discardLocalWorktree(r *git.Repository, w *git.Worktree) error {
+	head, err := r.Head()
+	if err != nil {
+		return fmt.Errorf("head: %w", err)
+	}
+	if err := w.Reset(&git.ResetOptions{Mode: git.HardReset, Commit: head.Hash()}); err != nil {
+		return fmt.Errorf("reset hard: %w", err)
+	}
+	if err := w.Clean(&git.CleanOptions{Dir: true}); err != nil {
+		return fmt.Errorf("clean: %w", err)
+	}
+	return nil
+}
+
+// FullRevision returns the full hex commit hash at HEAD.
+func FullRevision(localPath string) (string, error) {
+	r, err := git.PlainOpen(localPath)
+	if err != nil {
+		return "", err
+	}
+	head, err := r.Head()
+	if err != nil {
+		return "", err
+	}
+	return head.Hash().String(), nil
+}
+
+// ShortRevision returns a 7-character prefix of the commit at HEAD.
+func ShortRevision(localPath string) (string, error) {
+	full, err := FullRevision(localPath)
+	if err != nil {
+		return "", err
+	}
+	if len(full) >= 7 {
+		return full[:7], nil
+	}
+	return full, nil
+}
+
 // Sync clones or pulls the repo. Returns (localPath, updated, err).
 // updated is true when the repo was just cloned or pull fetched new commits.
 func Sync(c *config.Config, repoURL string) (localPath string, updated bool, err error) {
-	dirName := repoDirName(repoURL)
+	dirName := RepoDirName(repoURL)
 	localPath = filepath.Join(c.Workdir, dirName)
 
 	var auth transport.AuthMethod
@@ -60,6 +101,9 @@ func Sync(c *config.Config, repoURL string) (localPath string, updated bool, err
 	if err != nil {
 		return "", false, fmt.Errorf("worktree: %w", err)
 	}
+	if err := discardLocalWorktree(r, w); err != nil {
+		return "", false, fmt.Errorf("discard local worktree: %w", err)
+	}
 	err = w.Pull(&git.PullOptions{Auth: auth, Depth: 1})
 	if err != nil && err != git.NoErrAlreadyUpToDate {
 		return "", false, fmt.Errorf("pull %s: %w", repoURL, err)
@@ -68,7 +112,8 @@ func Sync(c *config.Config, repoURL string) (localPath string, updated bool, err
 	return localPath, updated, nil
 }
 
-func repoDirName(url string) string {
+// RepoDirName returns the basename used for the clone directory under workdir.
+func RepoDirName(url string) string {
 	url = strings.TrimSuffix(url, ".git")
 	if i := strings.LastIndex(url, "/"); i >= 0 {
 		url = url[i+1:]
@@ -93,7 +138,7 @@ func OverrideScriptBasename(repoURL string) string {
 	} else if i := strings.Index(repoURL, ":"); i >= 0 {
 		path = repoURL[i+1:]
 	} else {
-		return repoDirName(repoURL)
+		return RepoDirName(repoURL)
 	}
 	parts := strings.Split(path, "/")
 	if len(parts) >= 2 {
@@ -102,5 +147,5 @@ func OverrideScriptBasename(repoURL string) string {
 	if len(parts) == 1 && parts[0] != "" {
 		return parts[0]
 	}
-	return repoDirName(repoURL)
+	return RepoDirName(repoURL)
 }

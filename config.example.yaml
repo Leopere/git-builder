@@ -1,36 +1,20 @@
-#
-# Full default config for git-builder.
-# Copy to /etc/git-builder/config.yaml on the target host and adjust.
-#
+# git-builder config (YAML only). Default path: /etc/git-builder/config.yaml
 
-# How often to poll all repos (seconds). Default/min: 60. Recommended: 300.
 poll_interval_seconds: 60
-
-# Where to clone repos.
 workdir: /var/lib/git-builder/repos
-
-# SSH key filename under /etc/git-builder (e.g. id_ed25519 or id_rsa).
 ssh_key: id_ed25519
 
-# Optional: GitHub token for HTTPS repos (set in YAML only).
-# Fine-grained token with only Contents read (clone/pull): 
-# https://github.com/settings/personal-access-tokens/new?name=git-builder&description=Clone+and+pull+repos+over+HTTPS&contents=read
+# HTTPS clone/pull (optional). Fine-grained token Contents: Read.
 # github_token: <token>
 
-# Optional: env vars passed to the build script. Keys are variable names, values are secret.
-# script_env:
-#   GHCR_TOKEN: <token>   # e.g. for docker login ghcr.io
-# Shorthand: ghcr_token sets GHCR_TOKEN if not in script_env.
+# Script env: ghcr_token or GHCR_TOKEN set GHCR_TOKEN; ghcr_user used for docker login ghcr.io.
 # ghcr_token: <token>
+# ghcr_user: Leopere
+# script_env: { }
 
-# Max repos building at once (sync+script). Default: number of CPUs; min 1.
-# max_concurrent: 4
-
-# Optional: directory for local override scripts named OWNER-REPO.sh (e.g. owner-repo.sh).
-# If set and a matching file exists, it is run instead of the repo's .git-builder.sh (still in repo cwd).
-# local_override_dir: /etc/git-builder/scripts
+max_concurrent: 4
+# local_override_dir: /etc/git-builder/local-overrides
 
 repos:
-  # SSH (uses ssh_key above) or HTTPS (uses github_token when set). Quote URLs that contain ':'.
-  - url: "https://github.com/OWNER/repo-name.git"
-  # - url: "git@github.com:OWNER/repo-name.git"
+  - url: "https://github.com/OWNER/repo.git"
+  # - url: "git@github.com:OWNER/repo.git"

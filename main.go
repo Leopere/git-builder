@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strings"
@@ -97,26 +99,43 @@ func main() {
 					log.Printf("sync failed %s: %v", url, err)
 					return
 				}
-				if updated {
-					log.Printf("sync succeeded %s (repo updated)", url)
-				} else {
-					log.Printf("sync succeeded %s (already up to date)", url)
-				}
+				logSyncOutcome("", url, localPath, updated)
 				if !updated {
 					return
 				}
+				fullHash, err := gitops.FullRevision(localPath)
+				if err != nil {
+					log.Printf("sync succeeded but read head %s: %v", url, err)
+					return
+				}
+				if gitops.IsDeployed(cfg.Workdir, url, fullHash) {
+					log.Printf("sync skipped %s (already deployed at this commit) %s", url, shortRevOrQuery(localPath))
+					return
+				}
+				defer removeRepoWorkdir(localPath)
 				overridePath := ""
 				if d := cfg.OverrideScriptDir(); d != "" {
 					overridePath = filepath.Join(d, gitops.OverrideScriptBasename(url)+".sh")
 				}
 				scriptEnv := scriptEnvFromConfig(cfg)
+				if token := scriptEnv["GHCR_TOKEN"]; token != "" {
+					if err := dockerLoginGHCR(context.Background(), token, strings.TrimSpace(cfg.GhcrUser)); err != nil {
+						log.Printf("ghcr login failed %s: %v", url, err)
+						return
+					}
+				}
 				ran, err := run.RunIfPresent(context.Background(), localPath, overridePath, scriptEnv)
 				if err != nil {
 					log.Printf("script failed %s: %v", url, err)
-				} else if ran {
-					log.Printf("script completed successfully %s", url)
+					return
+				}
+				if ran {
+					logScriptSuccess(url, localPath)
 				} else {
 					log.Printf("no script to run %s", url)
+				}
+				if err := gitops.SetDeployed(cfg.Workdir, url, fullHash); err != nil {
+					log.Printf("warning: save deploy state %s: %v", url, err)
 				}
 			}()
 		}
@@ -140,26 +159,36 @@ func main() {
 		if err != nil {
 			log.Fatalf("trigger: sync failed %s: %v", *triggerURL, err)
 		}
-		if updated {
-			log.Printf("trigger: sync succeeded %s (repo updated)", *triggerURL)
-		} else {
-			log.Printf("trigger: sync succeeded %s (already up to date)", *triggerURL)
+		logSyncOutcome("trigger: ", *triggerURL, localPath, updated)
+		fullHash, err := gitops.FullRevision(localPath)
+		if err != nil {
+			log.Fatalf("trigger: read head %s: %v", *triggerURL, err)
 		}
+		defer removeRepoWorkdir(localPath)
 		overridePath := ""
 		if d := cfg.OverrideScriptDir(); d != "" {
 			overridePath = filepath.Join(d, gitops.OverrideScriptBasename(*triggerURL)+".sh")
 		}
 		log.Printf("trigger: running script (repo=%s)", localPath)
 		scriptEnv := scriptEnvFromConfig(cfg)
+		if token := scriptEnv["GHCR_TOKEN"]; token != "" {
+			if err := dockerLoginGHCR(context.Background(), token, strings.TrimSpace(cfg.GhcrUser)); err != nil {
+				log.Fatalf("trigger: ghcr login failed: %v", err)
+			}
+			log.Printf("trigger: logged into ghcr.io")
+		}
 		log.Printf("trigger: passing %d script env vars", len(scriptEnv))
 		ran, err := run.RunIfPresentWithStdio(context.Background(), localPath, overridePath, scriptEnv, os.Stdout, os.Stderr)
 		if err != nil {
 			log.Fatalf("trigger: script failed %s: %v", *triggerURL, err)
 		}
 		if ran {
-			log.Printf("trigger: script completed successfully, done %s", *triggerURL)
+			log.Printf("trigger: script completed successfully, done %s %s", *triggerURL, shortRevOrQuery(localPath))
 		} else {
 			log.Printf("trigger: no script to run, done %s", *triggerURL)
+		}
+		if err := gitops.SetDeployed(cfg.Workdir, *triggerURL, fullHash); err != nil {
+			log.Printf("trigger: warning: save deploy state: %v", err)
 		}
 		return
 	}
@@ -200,20 +229,33 @@ func main() {
 					log.Printf("sync failed %s: %v", url, err)
 					return
 				}
-				if updated {
-					log.Printf("sync succeeded %s (repo updated)", url)
-				} else {
-					log.Printf("sync succeeded %s (already up to date)", url)
-				}
+				logSyncOutcome("", url, localPath, updated)
 				if !updated {
 					return
 				}
+				fullHash, err := gitops.FullRevision(localPath)
+				if err != nil {
+					log.Printf("sync succeeded but read head %s: %v", url, err)
+					return
+				}
+				if gitops.IsDeployed(cfg.Workdir, url, fullHash) {
+					log.Printf("sync skipped %s (already deployed at this commit) %s", url, shortRevOrQuery(localPath))
+					return
+				}
+				defer removeRepoWorkdir(localPath)
 				overridePath := ""
 				if d := cfg.OverrideScriptDir(); d != "" {
 					overridePath = filepath.Join(d, gitops.OverrideScriptBasename(url)+".sh")
 				}
 				scriptEnv := scriptEnvFromConfig(cfg)
 				ctx, cancel := context.WithCancel(context.Background())
+				if token := scriptEnv["GHCR_TOKEN"]; token != "" {
+					if err := dockerLoginGHCR(ctx, token, strings.TrimSpace(cfg.GhcrUser)); err != nil {
+						log.Printf("ghcr login failed %s: %v", url, err)
+						cancel()
+						return
+					}
+				}
 				jobMu.Lock()
 				activeJobs[url] = cancel
 				state := strings.Join(activeJobURLs(activeJobs), ",")
@@ -223,9 +265,14 @@ func main() {
 				if err != nil {
 					log.Printf("script failed %s: %v", url, err)
 				} else if ran {
-					log.Printf("script completed successfully %s", url)
+					logScriptSuccess(url, localPath)
 				} else {
 					log.Printf("no script to run %s", url)
+				}
+				if err == nil {
+					if err := gitops.SetDeployed(cfg.Workdir, url, fullHash); err != nil {
+						log.Printf("warning: save deploy state %s: %v", url, err)
+					}
 				}
 				jobMu.Lock()
 				delete(activeJobs, url)
@@ -287,6 +334,23 @@ func activeJobURLs(jobs map[string]context.CancelFunc) []string {
 	return urls
 }
 
+const defaultGhcrUser = "Leopere"
+
+// dockerLoginGHCR runs `docker login ghcr.io` so the daemon can pull from GHCR.
+// user may be empty; then defaultGhcrUser is used.
+func dockerLoginGHCR(ctx context.Context, token, user string) error {
+	if user == "" {
+		user = defaultGhcrUser
+	}
+	cmd := exec.CommandContext(ctx, "docker", "login", "ghcr.io", "-u", user, "--password-stdin")
+	cmd.Stdin = strings.NewReader(token)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("docker login ghcr.io: %w\n%s", err, out)
+	}
+	return nil
+}
+
 func scriptEnvFromConfig(cfg *config.Config) map[string]string {
 	out := make(map[string]string)
 	for k, v := range cfg.ScriptEnv {
@@ -298,6 +362,13 @@ func scriptEnvFromConfig(cfg *config.Config) map[string]string {
 		if token != "" && out["GHCR_TOKEN"] == "" {
 			out["GHCR_TOKEN"] = token
 			break
+		}
+	}
+	if out["GHCR_TOKEN"] == "" {
+		// Fallback for repos that only know about GHCR_TOKEN (e.g. bert-ner),
+		// while our config may only provide github_token.
+		if t := strings.TrimSpace(cfg.TokenFromConfig); t != "" {
+			out["GHCR_TOKEN"] = t
 		}
 	}
 	if len(out) == 0 {

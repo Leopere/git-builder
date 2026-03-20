@@ -25,6 +25,7 @@ type Config struct {
 	TokenFromConfig     string            `yaml:"github_token"`
 	GhcrToken           string            `yaml:"ghcr_token"`
 	GhcrTokenAlt        string            `yaml:"GHCR_TOKEN"`
+	GhcrUser            string            `yaml:"ghcr_user"` // optional; used for docker login ghcr.io (default Leopere)
 	ScriptEnv           map[string]string `yaml:"script_env"`
 	MaxConcurrent       int               `yaml:"max_concurrent"`
 	Repos               []Repo            `yaml:"repos"`

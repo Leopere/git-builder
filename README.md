@@ -27,16 +27,19 @@ Copy [config.example.yaml](config.example.yaml) to your config location and edit
 
 Configuration is read exclusively from the YAML file; no environment variables are used.
 
-**Config fields:**
+**Config fields (YAML only):**
 
-- `poll_interval_seconds` — How often to poll all repos (default 60, min 60, recommended 300).
-- `workdir` — Where to clone repos (e.g. `/var/lib/git-builder/repos`). If unwritable, falls back to `repos` next to the binary.
-- `ssh_key` — SSH key filename under `/etc/git-builder` (e.g. `id_ed25519`). System default `~/.ssh` keys are tried if not set there.
-- `github_token` — Optional; for HTTPS repos. Set in the YAML config file.
-- `script_env` — Optional map of env vars passed to the build script (e.g. `GHCR_TOKEN` for `docker login ghcr.io`). Keys are variable names.
-- `ghcr_token` — Optional shorthand; sets `GHCR_TOKEN` in script env if not already in `script_env`.
-- `repos` — List of `url` entries (SSH or HTTPS). Example: `git@github.com:user/repo.git` or `https://github.com/user/repo.git`.
-- `local_override_dir` — Optional. Directory for host-local scripts named `OWNER-REPO.sh` (e.g. `Leopere-git-builder.sh`). If set and a matching file exists, it is run instead of the repo's `.git-builder.sh`, still with the repo clone as working directory.
+- `poll_interval_seconds` — Poll interval in seconds (default 60, min 60).
+- `workdir` — Clone directory (default `/var/lib/git-builder/repos`).
+- `ssh_key` — Key filename under `/etc/git-builder` (default `id_ed25519`).
+- `github_token` — Optional; for HTTPS clone/pull.
+- `ghcr_token` — Optional; sets `GHCR_TOKEN` in script env; used for `docker login ghcr.io` before scripts.
+- `GHCR_TOKEN` — Optional alternate YAML key for same as `ghcr_token`.
+- `ghcr_user` — Optional; username for `docker login ghcr.io` (default Leopere).
+- `script_env` — Optional map of env vars passed to the script.
+- `max_concurrent` — Max repos building at once (default: NumCPU).
+- `local_override_dir` — Optional; directory for `OWNER-REPO.sh` override scripts.
+- `repos` — List of `url` (SSH or HTTPS).
 
 **Local override scripts:** When `local_override_dir` is set, git-builder looks for a file named `OWNER-REPO.sh` in that directory (e.g. `Leopere-git-builder.sh` for `git@github.com:Leopere/git-builder.git`). If present, that script is run instead of the repo's `.git-builder.sh`, so the host can define build steps that are triggered by repo updates but not stored in the repo.
 
@@ -90,7 +93,12 @@ git-builder --killjobs   # cancel current script run
 ## How it works
 
 - Polls each configured repo on an interval (clone if missing, pull with depth 1 if present).
-- **Script:** In each repo root, looks for `.git-builder.sh` (or a local override `OWNER-REPO.sh` in `local_override_dir` if set). Runs it only when the repo was **updated** (new clone or pull fetched new commits). Script stdout/stderr are logged.
+- **Clean worktree before pull:** For existing clones, git-builder runs `git reset --hard` to `HEAD` and `git clean -fd` before each pull so automation hosts never get stuck on local edits or untracked files.
+- **Deploy state:** Under `workdir/.git-builder-state/` (one small JSON file per repo), git-builder records the last **successfully deployed** commit SHA. If a sync updates the checkout to a commit that is **already** recorded there, the script is skipped and the clone is left on disk for the next poll.
+- **After a deploy job:** When the script runs (new commit or not yet recorded as deployed), it finishes, state is updated on success, then the **entire repo clone directory is removed** from `workdir`. The host keeps **journal logs** and **`.git-builder-state`** only; the next sync re-clones or pulls as needed. A failed script does not update state, so the next poll retries.
+- **`--trigger`:** Always runs the script (ignores deploy state), then removes the clone and updates state on success.
+- **Script:** In each repo root, looks for `.git-builder.sh` (or a local override `OWNER-REPO.sh` in `local_override_dir` if set). Runs when the repo was **updated** (new clone or pull fetched new commits) **and** that commit is not already recorded as deployed. Script stdout/stderr are logged.
+- **Logs:** Successful sync lines end with a **short commit hash** (7 hex chars) for the checkout used for that run. Compare to `git ls-remote <repo-url>` (or the SHA on GitHub) to confirm the server matches the revision you expect.
 - **Depth:** Clone and pull use depth 1 (shallow).
 - **Auth:** SSH repos use the configured key (or system default); HTTPS repos use `github_token` in config.
 
