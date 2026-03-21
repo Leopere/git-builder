@@ -15,6 +15,10 @@ ssh_key: id_ed25519
 max_concurrent: 4
 # local_override_dir: /etc/git-builder/local-overrides
 
+# Optional append-only JSON Lines audit log (timestamps, repo, commit, script path, start/success/failure).
+# Example: /var/lib/git-builder/run-events.log — use logrotate on the host if enabled.
+# run_log_path: /var/lib/git-builder/run-events.log
+
 repos:
   - url: "https://github.com/OWNER/repo.git"
   # - url: "git@github.com:OWNER/repo.git"

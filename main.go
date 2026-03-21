@@ -18,7 +18,6 @@ import (
 
 	"git-builder/config"
 	"git-builder/gitops"
-	"git-builder/run"
 	"git-builder/svc"
 )
 
@@ -39,7 +38,7 @@ func (f *lineFlushWriter) Write(p []byte) (n int, err error) {
 
 func main() {
 	log.SetOutput(&lineFlushWriter{w: os.Stdout})
-	log.SetFlags(log.LstdFlags)
+	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 
 	doInstall := flag.Bool("install", false, "install and start service (use 'go run . -install' for install-from-source)")
 	doUninstall := flag.Bool("uninstall", false, "remove service and binary")
@@ -124,7 +123,7 @@ func main() {
 						return
 					}
 				}
-				ran, err := run.RunIfPresent(context.Background(), localPath, overridePath, scriptEnv)
+				ran, err := runScriptWithAudit(context.Background(), cfg, url, localPath, fullHash, overridePath, scriptEnv, nil, nil)
 				if err != nil {
 					log.Printf("script failed %s: %v", url, err)
 					return
@@ -169,7 +168,6 @@ func main() {
 		if d := cfg.OverrideScriptDir(); d != "" {
 			overridePath = filepath.Join(d, gitops.OverrideScriptBasename(*triggerURL)+".sh")
 		}
-		log.Printf("trigger: running script (repo=%s)", localPath)
 		scriptEnv := scriptEnvFromConfig(cfg)
 		if token := scriptEnv["GHCR_TOKEN"]; token != "" {
 			if err := dockerLoginGHCR(context.Background(), token, strings.TrimSpace(cfg.GhcrUser)); err != nil {
@@ -178,7 +176,7 @@ func main() {
 			log.Printf("trigger: logged into ghcr.io")
 		}
 		log.Printf("trigger: passing %d script env vars", len(scriptEnv))
-		ran, err := run.RunIfPresentWithStdio(context.Background(), localPath, overridePath, scriptEnv, os.Stdout, os.Stderr)
+		ran, err := runScriptWithAudit(context.Background(), cfg, *triggerURL, localPath, fullHash, overridePath, scriptEnv, os.Stdout, os.Stderr)
 		if err != nil {
 			log.Fatalf("trigger: script failed %s: %v", *triggerURL, err)
 		}
@@ -261,7 +259,7 @@ func main() {
 				state := strings.Join(activeJobURLs(activeJobs), ",")
 				jobMu.Unlock()
 				_ = svc.WriteState(state)
-				ran, err := run.RunIfPresent(ctx, localPath, overridePath, scriptEnv)
+				ran, err := runScriptWithAudit(ctx, cfg, url, localPath, fullHash, overridePath, scriptEnv, nil, nil)
 				if err != nil {
 					log.Printf("script failed %s: %v", url, err)
 				} else if ran {

@@ -30,6 +30,7 @@ type Config struct {
 	MaxConcurrent       int               `yaml:"max_concurrent"`
 	Repos               []Repo            `yaml:"repos"`
 	LocalOverrideDir    string            `yaml:"local_override_dir"`
+	RunLogPath          string            `yaml:"run_log_path"`
 }
 
 type Repo struct {

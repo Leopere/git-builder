@@ -39,6 +39,7 @@ Configuration is read exclusively from the YAML file; no environment variables a
 - `script_env` — Optional map of env vars passed to the script.
 - `max_concurrent` — Max repos building at once (default: NumCPU).
 - `local_override_dir` — Optional; directory for `OWNER-REPO.sh` override scripts.
+- `run_log_path` — Optional; append-only **run audit log** (JSON Lines: timestamps, repo URL, full commit, script path/kind, `start` / `success` / `failure`). Empty disables the file; use host **logrotate** if you enable it (see below).
 - `repos` — List of `url` (SSH or HTTPS).
 
 **Local override scripts:** When `local_override_dir` is set, git-builder looks for a file named `OWNER-REPO.sh` in that directory (e.g. `Leopere-git-builder.sh` for `git@github.com:Leopere/git-builder.git`). If present, that script is run instead of the repo's `.git-builder.sh`, so the host can define build steps that are triggered by repo updates but not stored in the repo.
@@ -97,8 +98,10 @@ git-builder --killjobs   # cancel current script run
 - **Deploy state:** Under `workdir/.git-builder-state/` (one small JSON file per repo), git-builder records the last **successfully deployed** commit SHA. If a sync updates the checkout to a commit that is **already** recorded there, the script is skipped and the clone is left on disk for the next poll.
 - **After a deploy job:** When the script runs (new commit or not yet recorded as deployed), it finishes, state is updated on success, then the **entire repo clone directory is removed** from `workdir`. The host keeps **journal logs** and **`.git-builder-state`** only; the next sync re-clones or pulls as needed. A failed script does not update state, so the next poll retries.
 - **`--trigger`:** Always runs the script (ignores deploy state), then removes the clone and updates state on success.
-- **Script:** In each repo root, looks for `.git-builder.sh` (or a local override `OWNER-REPO.sh` in `local_override_dir` if set). Runs when the repo was **updated** (new clone or pull fetched new commits) **and** that commit is not already recorded as deployed. Script stdout/stderr are logged.
-- **Logs:** Successful sync lines end with a **short commit hash** (7 hex chars) for the checkout used for that run. Compare to `git ls-remote <repo-url>` (or the SHA on GitHub) to confirm the server matches the revision you expect.
+- **When the script runs (daemon / `--run-once`):** Only after a sync that **changed** the checkout (new clone or fetch brought new commits) **and** the resulting full commit SHA is **not** already in deploy state. The script that runs is always the one resolved **after** that sync: local override `OWNER-REPO.sh` if present, else `.git-builder.sh` in the repo root (latest tree after hard reset).
+- **Script:** In each repo root, looks for `.git-builder.sh` (or a local override `OWNER-REPO.sh` in `local_override_dir` if set). Script stdout/stderr are logged with microsecond timestamps on the standard logger.
+- **Run audit log:** If `run_log_path` is set, each script execution appends two JSON objects (one at start, one at end with `duration_ms` and `success` or `failure`). Inspect with `jq`: e.g. `tail -1 /var/lib/git-builder/run-events.log | jq .`
+- **Logs:** Successful sync lines end with a **short commit hash** (7 hex chars) for the checkout used for that run. Compare to `git ls-remote <repo-url>` (or the SHA on GitHub) to confirm the server matches the revision you expect. You will also see `script start … path=… kind=override|in-repo` before a script runs.
 - **Depth:** Clone and pull use depth 1 (shallow).
 - **Auth:** SSH repos use the configured key (or system default); HTTPS repos use `github_token` in config.
 

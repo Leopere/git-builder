@@ -11,7 +11,7 @@ A Go CLI daemon that polls configured git repositories (clone or pull with depth
 - **From a release:** Download the binary for the target OS/arch from [Releases](https://github.com/Leopere/git-builder/releases) and put it on `PATH` (e.g. `~/.local/bin` or `/usr/local/bin`).
 - **From source:** `git clone` this repo, then `go build -o git-builder .` or `make build`. Then run `./git-builder --install` to install and start the service (optional).
 
-Config: copy `config.example.yaml` to `/etc/git-builder/config.yaml`. Set `workdir`, `repos`; optionally `github_token` (HTTPS), `ghcr_token`/`ghcr_user` (GHCR pull), `script_env`, `local_override_dir`. All config is YAML only.
+Config: copy `config.example.yaml` to `/etc/git-builder/config.yaml`. Set `workdir`, `repos`; optionally `github_token` (HTTPS), `ghcr_token`/`ghcr_user` (GHCR pull), `script_env`, `local_override_dir`, `run_log_path` (optional JSON Lines audit file for script runs). All config is YAML only.
 
 ## Commands (for agents working in this repo)
 
@@ -22,7 +22,7 @@ Use finite, non-interactive commands only (no interactive prompts).
 - **Release (local, GitHub):** `./release.sh --gh v0.1.4` — requires `gh`; builds multi-arch binaries and runs `gh release create`
 - **Publish:** `./publish.sh -m "msg" [--host app.a250.ca]` — invokes **`./ship.sh`** (ship calls **`./release.sh`**). Same pipeline: `./ship.sh "msg" [...]`. Deploy only: `./release.sh --host <host>`
 - **Deploy binary only:** `./release.sh --host <host>` (no git)
-- **Manual trigger:** `git-builder --trigger <url>` — sync and run the build script for one configured repo once, then exit (e.g. after deploy: `ssh app.a250.ca 'sudo git-builder --trigger https://github.com/Leopere/rfetcher.git'`)
+- **Manual trigger:** `git-builder --trigger <url>` — sync and run the build script for one configured repo once, then exit (e.g. after deploy: `ssh app.a250.ca 'sudo git-builder --trigger https://github.com/Leopere/rfetcher.git'`). Unlike the daemon, **`--trigger` always runs the script if present** (ignores deploy state); use for on-demand deploys.
 
 ## Repo conventions
 
@@ -37,7 +37,9 @@ Use finite, non-interactive commands only (no interactive prompts).
 - `main.go` — flags, daemon loop, parallel poll (`max_concurrent`), SIGUSR1/SIGUSR2 job state
 - `config/` — YAML config: `MaxConcurrent`, workdir, SSH key, token, repos
 - `gitops/` — sync (clone/pull)
-- `run/` — run `.git-builder.sh` in repo root (or `local_override_dir`/`OWNER-REPO.sh` if set)
+- `run/` — resolve script (`ResolveScript`), run `.git-builder.sh` or override via `RunResolved` / `RunIfPresent`
+- `runlog/` — optional mutex-safe append-only JSON Lines run audit log (`run_log_path` in config)
+- `scriptaudit.go` — wires audit logging and `script start` lines for daemon, `--run-once`, and `--trigger`
 - `svc/` — pid/state files, install/uninstall, ListJobs/KillJobs
 - Config example: `config.example.yaml`. Default config path: `/etc/git-builder/config.yaml` (no env overrides)
 
