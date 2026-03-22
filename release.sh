@@ -87,10 +87,11 @@ TMP_LOCAL="/tmp/git-builder-new.$$"
 GOOS=linux GOARCH=amd64 go build -o "$TMP_LOCAL" .
 
 TMP_REMOTE="/tmp/git-builder-new.$$"
-# Keepalives reduce mid-transfer "Connection reset by peer" on flaky paths.
+# Keepalives reduce mid-transfer disconnects on flaky paths.
 SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=30 -o ServerAliveInterval=30 -o ServerAliveCountMax=6)
 echo "Uploading to $HOST..."
-scp "${SSH_OPTS[@]}" "$TMP_LOCAL" "$HOST:$TMP_REMOTE"
+# Stream the binary over SSH instead of SCP; this has been more reliable on this host.
+ssh "${SSH_OPTS[@]}" "$HOST" "cat > '$TMP_REMOTE'" < "$TMP_LOCAL"
 
 echo "Restarting git-builder on $HOST..."
 ssh "${SSH_OPTS[@]}" "$HOST" \
