@@ -56,19 +56,6 @@ func ShortRevision(localPath string) (string, error) {
 	return full, nil
 }
 
-// shallowSyncRecoverable reports whether a failed fetch/pull/reset on a depth-1
-// clone is worth healing by deleting the local tree and cloning again.
-func shallowSyncRecoverable(err error) bool {
-	if err == nil {
-		return false
-	}
-	s := strings.ToLower(err.Error())
-	return strings.Contains(s, "object not found") ||
-		strings.Contains(s, "unknown revision") ||
-		strings.Contains(s, "non-fast-forward") ||
-		strings.Contains(s, "shallow") && strings.Contains(s, "update")
-}
-
 func originTipHash(r *git.Repository) (plumbing.Hash, error) {
 	for _, name := range []plumbing.ReferenceName{
 		"refs/remotes/origin/main",
@@ -130,69 +117,68 @@ func Sync(c *config.Config, repoURL string) (localPath string, updated bool, err
 
 	reclone := func() error {
 		if err := os.RemoveAll(localPath); err != nil {
-			return fmt.Errorf("remove broken clone: %w", err)
+			return fmt.Errorf("remove clone: %w", err)
 		}
 		return plainCloneDepth1(localPath, repoURL, auth)
 	}
 
-	r, err := git.PlainOpen(localPath)
-	if err != nil {
-		return "", false, fmt.Errorf("open repo: %w", err)
-	}
-	w, err := r.Worktree()
-	if err != nil {
-		return "", false, fmt.Errorf("worktree: %w", err)
-	}
-	if err := discardLocalWorktree(r, w); err != nil {
-		return "", false, fmt.Errorf("discard local worktree: %w", err)
+	// Any failure while using the existing clone (corrupt index, broken reset, bad objects,
+	// missing remote, fetch/reset errors, etc.) is healed by deleting the tree and cloning
+	// again — local workdir state must never block a successful sync.
+	syncExisting := func() (updated bool, err error) {
+		r, err := git.PlainOpen(localPath)
+		if err != nil {
+			return false, fmt.Errorf("open repo: %w", err)
+		}
+		w, err := r.Worktree()
+		if err != nil {
+			return false, fmt.Errorf("worktree: %w", err)
+		}
+		if err := discardLocalWorktree(r, w); err != nil {
+			return false, fmt.Errorf("discard local worktree: %w", err)
+		}
+
+		headBefore, err := r.Head()
+		if err != nil {
+			return false, fmt.Errorf("head before sync: %w", err)
+		}
+		beforeHash := headBefore.Hash()
+
+		rem, err := r.Remote("origin")
+		if err != nil {
+			return false, fmt.Errorf("remote origin: %w", err)
+		}
+
+		fetchErr := rem.Fetch(&git.FetchOptions{Auth: auth, Depth: 1})
+		if fetchErr != nil && fetchErr != git.NoErrAlreadyUpToDate {
+			return false, fmt.Errorf("fetch %s: %w", repoURL, fetchErr)
+		}
+
+		tipHash, err := originTipHash(r)
+		if err != nil {
+			return false, fmt.Errorf("resolve origin tip %s: %w", repoURL, err)
+		}
+		if tipHash == beforeHash {
+			return false, nil
+		}
+
+		if err := w.Reset(&git.ResetOptions{Mode: git.HardReset, Commit: tipHash}); err != nil {
+			return false, fmt.Errorf("reset %s: %w", repoURL, err)
+		}
+		if err := w.Clean(&git.CleanOptions{Dir: true}); err != nil {
+			return false, fmt.Errorf("clean after reset: %w", err)
+		}
+		return true, nil
 	}
 
-	headBefore, err := r.Head()
-	if err != nil {
-		return "", false, fmt.Errorf("head before sync: %w", err)
-	}
-	beforeHash := headBefore.Hash()
-
-	rem, err := r.Remote("origin")
-	if err != nil {
+	updated, syncErr := syncExisting()
+	if syncErr != nil {
 		if err := reclone(); err != nil {
-			return "", false, fmt.Errorf("clone %s: %w", repoURL, err)
+			return "", false, fmt.Errorf("%s: %w; reclone: %w", repoURL, syncErr, err)
 		}
 		return localPath, true, nil
 	}
-
-	fetchErr := rem.Fetch(&git.FetchOptions{Auth: auth, Depth: 1})
-	if fetchErr != nil && fetchErr != git.NoErrAlreadyUpToDate {
-		if shallowSyncRecoverable(fetchErr) {
-			if err := reclone(); err != nil {
-				return "", false, fmt.Errorf("clone %s: %w", repoURL, err)
-			}
-			return localPath, true, nil
-		}
-		return "", false, fmt.Errorf("fetch %s: %w", repoURL, fetchErr)
-	}
-
-	tipHash, err := originTipHash(r)
-	if err != nil {
-		return "", false, fmt.Errorf("resolve origin tip %s: %w", repoURL, err)
-	}
-	if tipHash == beforeHash {
-		return localPath, false, nil
-	}
-
-	if err := w.Reset(&git.ResetOptions{Mode: git.HardReset, Commit: tipHash}); err != nil {
-		if shallowSyncRecoverable(err) {
-			if err := reclone(); err != nil {
-				return "", false, fmt.Errorf("clone %s: %w", repoURL, err)
-			}
-			return localPath, true, nil
-		}
-		return "", false, fmt.Errorf("reset %s: %w", repoURL, err)
-	}
-	if err := w.Clean(&git.CleanOptions{Dir: true}); err != nil {
-		return "", false, fmt.Errorf("clean after reset: %w", err)
-	}
-	return localPath, true, nil
+	return localPath, updated, nil
 }
 
 // RepoDirName returns the basename used for the clone directory under workdir.

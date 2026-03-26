@@ -71,9 +71,10 @@ Syncs all repos and runs `.git-builder.sh` only in repos that were just cloned o
 git-builder --trigger <url>
 ```
 
-Syncs that repo and runs its build script once, then exits. The repo must be listed in config. Use after a deploy to run the build on demand, e.g.:
+Syncs that repo and runs its build script once, then exits. The repo must be listed in config. Use after a deploy to run the **same** deploy script on demand that the daemon would run for a new commit (see [docs/AGENT.md](docs/AGENT.md)):
 
 ```bash
+ssh app.a250.ca 'sudo git-builder --trigger https://github.com/Leopere/feedmon.git'
 ssh app.a250.ca 'sudo git-builder --trigger https://github.com/Leopere/rfetcher.git'
 ```
 
@@ -95,6 +96,7 @@ git-builder --killjobs   # cancel current script run
 
 - Polls each configured repo on an interval (clone if missing, pull with depth 1 if present).
 - **Clean worktree before pull:** For existing clones, git-builder runs `git reset --hard` to `HEAD` and `git clean -fd` before each pull so automation hosts never get stuck on local edits or untracked files.
+- **Broken or corrupt clones:** If opening the repo, resetting, fetching, or advancing to `origin/main` fails for any reason, git-builder **deletes that clone directory** and does a fresh shallow clone. Local tree problems must never block sync.
 - **Deploy state:** Under `workdir/.git-builder-state/` (one small JSON file per repo), git-builder records the last **successfully deployed** commit SHA. If a sync updates the checkout to a commit that is **already** recorded there, the script is skipped and the clone is left on disk for the next poll.
 - **After a deploy job:** When the script runs (new commit or not yet recorded as deployed), it finishes, state is updated on success, then the **entire repo clone directory is removed** from `workdir`. The host keeps **journal logs** and **`.git-builder-state`** only; the next sync re-clones or pulls as needed. A failed script does not update state, so the next poll retries.
 - **`--trigger`:** Always runs the script (ignores deploy state), then removes the clone and updates state on success.
@@ -111,6 +113,7 @@ Builds and releases are handled by GitHub Actions:
 
 - **Push to `main`:** Tests run, all OS/arch binaries are built (cross-compiled), and the **latest** release is updated (tag `latest`).
 - **Push a version tag (e.g. `v0.1.3`):** Tests run, binaries are built, and a **versioned** release is created for that tag.
+- **Manual (`workflow_dispatch`):** Same build and **latest** release steps as a push to `main` — run from the Actions tab without a new commit (branch selector: use `main`).
 
 To publish a new version:
 

@@ -22,7 +22,7 @@ Use finite, non-interactive commands only (no interactive prompts).
 - **Release (local, GitHub):** `./release.sh --gh v0.1.4` — requires `gh`; builds multi-arch binaries and runs `gh release create`
 - **Publish:** `./publish.sh -m "msg" [--host app.a250.ca]` — invokes **`./ship.sh`** (ship calls **`./release.sh`**). Same pipeline: `./ship.sh "msg" [...]`. Deploy only: `./release.sh --host <host>`
 - **Deploy binary only:** `./release.sh --host <host>` (no git)
-- **Manual trigger:** `git-builder --trigger <url>` — sync and run the build script for one configured repo once, then exit (e.g. after deploy: `ssh app.a250.ca 'sudo git-builder --trigger https://github.com/Leopere/rfetcher.git'`). Unlike the daemon, **`--trigger` always runs the script if present** (ignores deploy state); use for on-demand deploys.
+- **Manual trigger (same logic as a fresh deploy):** `git-builder --trigger <url>` — sync and run the build script for one configured repo once, then exit. Unlike the daemon, **`--trigger` always runs the script if present** (ignores deploy state). Use for feeds like **feedmon** / **rfetcher** when you need a deploy without waiting for the next poll, e.g. `ssh app.a250.ca 'sudo git-builder --trigger https://github.com/Leopere/feedmon.git'` or the same with `rfetcher.git`.
 
 ## Repo conventions
 
@@ -45,7 +45,7 @@ Use finite, non-interactive commands only (no interactive prompts).
 
 ## CI
 
-GitHub Actions (`.github/workflows/build-release.yml`): push to `main` → test, build, update `latest` release; push tag `v*` → test, build, versioned release. Use `gh run list`, `gh run view <id> --log-failed` to debug failures.
+GitHub Actions (`.github/workflows/build-release.yml`): push to `main` → test, build, update `latest` release; push tag `v*` → test, build, versioned release; **`workflow_dispatch`** runs the same build/test/release steps for `main` without a push (Actions → Run workflow). Use `gh run list`, `gh run view <id> --log-failed` to debug failures.
 
 ## MCP
 

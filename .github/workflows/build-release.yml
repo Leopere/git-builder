@@ -1,9 +1,11 @@
 name: Build and Release
 
+# push/tag: normal CI. workflow_dispatch: same jobs for the selected branch (e.g. main) without a push.
 on:
   push:
     branches: [main]
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
