@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"git-builder/config"
 
 	"github.com/go-git/go-git/v5"
+	gitcfg "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
@@ -56,11 +58,15 @@ func ShortRevision(localPath string) (string, error) {
 	return full, nil
 }
 
-func originTipHash(r *git.Repository) (plumbing.Hash, error) {
-	for _, name := range []plumbing.ReferenceName{
+func originTipHash(r *git.Repository, branch string) (plumbing.Hash, error) {
+	names := []plumbing.ReferenceName{
 		"refs/remotes/origin/main",
 		"refs/remotes/origin/master",
-	} {
+	}
+	if branch != "" {
+		names = []plumbing.ReferenceName{plumbing.NewRemoteReferenceName("origin", branch)}
+	}
+	for _, name := range names {
 		ref, err := r.Reference(name, true)
 		if err != nil {
 			continue
@@ -70,22 +76,32 @@ func originTipHash(r *git.Repository) (plumbing.Hash, error) {
 			return h, nil
 		}
 	}
+	if branch != "" {
+		return plumbing.ZeroHash, fmt.Errorf("no refs/remotes/origin/%s", branch)
+	}
 	return plumbing.ZeroHash, fmt.Errorf("no refs/remotes/origin/main or origin/master")
 }
 
-func plainCloneDepth1(localPath, repoURL string, auth transport.AuthMethod) error {
-	_, err := git.PlainClone(localPath, false, &git.CloneOptions{
-		URL:   repoURL,
+func plainCloneDepth1(localPath string, repo config.Repo, auth transport.AuthMethod) error {
+	opts := &git.CloneOptions{
+		URL:   repo.URL,
 		Auth:  auth,
 		Depth: 1,
-	})
+	}
+	if branch := repo.BranchName(); branch != "" {
+		opts.ReferenceName = plumbing.NewBranchReferenceName(branch)
+		opts.SingleBranch = true
+	}
+	_, err := git.PlainClone(localPath, false, opts)
 	return err
 }
 
 // Sync clones or pulls the repo. Returns (localPath, updated, err).
 // updated is true when the repo was just cloned or pull fetched new commits.
-func Sync(c *config.Config, repoURL string) (localPath string, updated bool, err error) {
-	dirName := RepoDirName(repoURL)
+func Sync(c *config.Config, repo config.Repo) (localPath string, updated bool, err error) {
+	repoURL := repo.URL
+	branch := repo.BranchName()
+	dirName := RepoWorkdirName(repo)
 	localPath = filepath.Join(c.Workdir, dirName)
 
 	var auth transport.AuthMethod
@@ -107,7 +123,7 @@ func Sync(c *config.Config, repoURL string) (localPath string, updated bool, err
 	_, err = os.Stat(filepath.Join(localPath, ".git"))
 	if err != nil {
 		if os.IsNotExist(err) {
-			if err := plainCloneDepth1(localPath, repoURL, auth); err != nil {
+			if err := plainCloneDepth1(localPath, repo, auth); err != nil {
 				return "", false, fmt.Errorf("clone %s: %w", repoURL, err)
 			}
 			return localPath, true, nil
@@ -119,7 +135,7 @@ func Sync(c *config.Config, repoURL string) (localPath string, updated bool, err
 		if err := os.RemoveAll(localPath); err != nil {
 			return fmt.Errorf("remove clone: %w", err)
 		}
-		return plainCloneDepth1(localPath, repoURL, auth)
+		return plainCloneDepth1(localPath, repo, auth)
 	}
 
 	// Any failure while using the existing clone (corrupt index, broken reset, bad objects,
@@ -149,12 +165,18 @@ func Sync(c *config.Config, repoURL string) (localPath string, updated bool, err
 			return false, fmt.Errorf("remote origin: %w", err)
 		}
 
-		fetchErr := rem.Fetch(&git.FetchOptions{Auth: auth, Depth: 1})
+		fetchOpts := &git.FetchOptions{Auth: auth, Depth: 1}
+		if branch != "" {
+			fetchOpts.RefSpecs = []gitcfg.RefSpec{
+				gitcfg.RefSpec(fmt.Sprintf("+refs/heads/%s:refs/remotes/origin/%s", branch, branch)),
+			}
+		}
+		fetchErr := rem.Fetch(fetchOpts)
 		if fetchErr != nil && fetchErr != git.NoErrAlreadyUpToDate {
 			return false, fmt.Errorf("fetch %s: %w", repoURL, fetchErr)
 		}
 
-		tipHash, err := originTipHash(r)
+		tipHash, err := originTipHash(r, branch)
 		if err != nil {
 			return false, fmt.Errorf("resolve origin tip %s: %w", repoURL, err)
 		}
@@ -191,6 +213,21 @@ func RepoDirName(url string) string {
 		url = url[i+1:]
 	}
 	return url
+}
+
+var branchUnsafeChars = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
+
+func RepoWorkdirName(repo config.Repo) string {
+	base := RepoDirName(repo.URL)
+	branch := repo.BranchName()
+	if branch == "" {
+		return base
+	}
+	safeBranch := strings.Trim(branchUnsafeChars.ReplaceAllString(branch, "-"), "-")
+	if safeBranch == "" {
+		safeBranch = "branch"
+	}
+	return base + "@" + safeBranch
 }
 
 // OverrideScriptBasename returns the basename (no .sh) for a local override script,

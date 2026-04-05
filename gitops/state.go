@@ -4,19 +4,21 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+
+	"git-builder/config"
 )
 
 type deployState struct {
 	LastSuccessSHA string `json:"last_success_sha"`
 }
 
-func deployStatePath(workdir, repoURL string) string {
-	return filepath.Join(workdir, ".git-builder-state", RepoDirName(repoURL)+".json")
+func deployStatePath(workdir string, repo config.Repo) string {
+	return filepath.Join(workdir, ".git-builder-state", RepoWorkdirName(repo)+".json")
 }
 
 // IsDeployed reports whether this full commit hash was already successfully deployed for the repo.
-func IsDeployed(workdir, repoURL, headFullHex string) bool {
-	b, err := os.ReadFile(deployStatePath(workdir, repoURL))
+func IsDeployed(workdir string, repo config.Repo, headFullHex string) bool {
+	b, err := os.ReadFile(deployStatePath(workdir, repo))
 	if err != nil {
 		return false
 	}
@@ -28,8 +30,8 @@ func IsDeployed(workdir, repoURL, headFullHex string) bool {
 }
 
 // SetDeployed records that headFullHex was successfully deployed (script OK or no script needed).
-func SetDeployed(workdir, repoURL, headFullHex string) error {
-	p := deployStatePath(workdir, repoURL)
+func SetDeployed(workdir string, repo config.Repo, headFullHex string) error {
+	p := deployStatePath(workdir, repo)
 	if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
 		return err
 	}

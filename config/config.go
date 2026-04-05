@@ -5,17 +5,18 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
 const (
-	DefaultConfigPath    = "/etc/git-builder/config.yaml"
-	DefaultPollInterval  = 60
-	MinPollInterval      = 60
+	DefaultConfigPath       = "/etc/git-builder/config.yaml"
+	DefaultPollInterval     = 60
+	MinPollInterval         = 60
 	RecommendedPollInterval = 300
-	DefaultWorkdir       = "/var/lib/git-builder/repos"
-	DefaultSSHKey        = "id_ed25519"
+	DefaultWorkdir          = "/var/lib/git-builder/repos"
+	DefaultSSHKey           = "id_ed25519"
 )
 
 type Config struct {
@@ -34,7 +35,12 @@ type Config struct {
 }
 
 type Repo struct {
-	URL string `yaml:"url"`
+	URL    string `yaml:"url"`
+	Branch string `yaml:"branch"`
+}
+
+func (r Repo) BranchName() string {
+	return strings.TrimSpace(r.Branch)
 }
 
 // ResolvePath returns the config path when path is empty (default path).

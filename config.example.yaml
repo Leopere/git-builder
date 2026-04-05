@@ -21,4 +21,6 @@ max_concurrent: 4
 
 repos:
   - url: "https://github.com/OWNER/repo.git"
+  #   branch: "main"
   # - url: "git@github.com:OWNER/repo.git"
+  #   branch: "release/stable"

@@ -40,7 +40,7 @@ Configuration is read exclusively from the YAML file; no environment variables a
 - `max_concurrent` — Max repos building at once (default: NumCPU).
 - `local_override_dir` — Optional; directory for `OWNER-REPO.sh` override scripts.
 - `run_log_path` — Optional; append-only **run audit log** (JSON Lines: timestamps, repo URL, full commit, script path/kind, `start` / `success` / `failure`). Empty disables the file; use host **logrotate** if you enable it (see below).
-- `repos` — List of `url` (SSH or HTTPS).
+- `repos` — List of repos with `url` (SSH or HTTPS) and optional `branch` (defaults to remote `main`, then `master`).
 
 **Local override scripts:** When `local_override_dir` is set, git-builder looks for a file named `OWNER-REPO.sh` in that directory (e.g. `Leopere-git-builder.sh` for `git@github.com:Leopere/git-builder.git`). If present, that script is run instead of the repo's `.git-builder.sh`, so the host can define build steps that are triggered by repo updates but not stored in the repo.
 
@@ -96,7 +96,7 @@ git-builder --killjobs   # cancel current script run
 
 - Polls each configured repo on an interval (clone if missing, pull with depth 1 if present).
 - **Clean worktree before pull:** For existing clones, git-builder runs `git reset --hard` to `HEAD` and `git clean -fd` before each pull so automation hosts never get stuck on local edits or untracked files.
-- **Broken or corrupt clones:** If opening the repo, resetting, fetching, or advancing to `origin/main` fails for any reason, git-builder **deletes that clone directory** and does a fresh shallow clone. Local tree problems must never block sync.
+- **Broken or corrupt clones:** If opening the repo, resetting, fetching, or advancing to the configured remote branch fails for any reason, git-builder **deletes that clone directory** and does a fresh shallow clone. Local tree problems must never block sync.
 - **Deploy state:** Under `workdir/.git-builder-state/` (one small JSON file per repo), git-builder records the last **successfully deployed** commit SHA. If a sync updates the checkout to a commit that is **already** recorded there, the script is skipped and the clone is left on disk for the next poll.
 - **After a deploy job:** When the script runs (new commit or not yet recorded as deployed), it finishes, state is updated on success, then the **entire repo clone directory is removed** from `workdir`. The host keeps **journal logs** and **`.git-builder-state`** only; the next sync re-clones or pulls as needed. A failed script does not update state, so the next poll retries.
 - **`--trigger`:** Always runs the script (ignores deploy state), then removes the clone and updates state on success.
