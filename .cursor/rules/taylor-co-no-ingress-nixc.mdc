@@ -1,0 +1,15 @@
+---
+description: Taylor Co SMS / git-builder path must not reference ingress or nixc.us
+alwaysApply: true
+---
+
+# Taylor Co SMS (taylor-co-smsbridge) scope
+
+This repository’s work for **Taylor Co** / **`taylor-co-smsbridge`**, **`config/sms-bridge.yaml`**, **`sms-bridge` deploy scripts**, and **examples** for that app:
+
+- **Must not** reference, use as a jump/SSH path, or document **ingress** hosts, **nixc.us**, or any **nixc**-scoped infrastructure.
+- **Must not** reintroduce those names in comments, examples, default image URLs, or assumed deploy topology.
+
+The operating assumption is: **git-builder and deploys target the Taylor host / Swarm path only** (e.g. `smsbridge.taylor-co.com` and that environment), with no relationship to the above.
+
+If something seems to require a nixc or ingress node, **stop** and ask the user instead of inferring it.
