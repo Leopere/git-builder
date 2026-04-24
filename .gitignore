@@ -3,3 +3,6 @@
 /git-builder.state
 /dist
 /testdata/dummy-repo/.git
+
+# Local only: GitHub deploy key for sms-bridge (see scripts/sms-bridge-provision.sh)
+deploy-keys/

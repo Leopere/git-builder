@@ -4,6 +4,8 @@
 #
 # Usage:
 #   ./release.sh --host app.a250.ca
+#   ./release.sh --host root@example.com --identity ~/.ssh/ca-userkey
+#   ./release.sh --host root@example.com --identity ~/.ssh/ca-userkey --certificate ~/.ssh/ca-userkey-cert.pub
 #
 # Optional:
 #   ./release.sh --gh v0.1.0     # run the original GitHub release flow (requires gh)
@@ -12,6 +14,8 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 HOST="app.a250.ca"
+IDENTITY=""
+CERTIFICATE=""
 DO_GH_RELEASE=0
 TAG=""
 
@@ -22,7 +26,9 @@ Usage:
   ./release.sh --gh <tag>
 
 Options:
-  --host <host>         Target host to deploy to (default: app.a250.ca)
+  --host <host>         Target host to deploy to (default: app.a250.ca); use user@host for SSH user
+  --identity <path>     Private key for ssh -i (optional)
+  --certificate <path>    User SSH certificate (CertificateFile) if your org uses -cert.pub signing (optional)
   --gh <tag>            Create a GitHub release using gh (runs the original multi-arch release build)
   -h, --help            Show this help
 EOF
@@ -32,6 +38,14 @@ while [[ $# -gt 0 ]]; do
   case "${1:-}" in
     --host)
       HOST="${2:-}"
+      shift 2
+      ;;
+    --identity)
+      IDENTITY="${2:-}"
+      shift 2
+      ;;
+    --certificate)
+      CERTIFICATE="${2:-}"
       shift 2
       ;;
     --gh)
@@ -89,6 +103,20 @@ GOOS=linux GOARCH=amd64 go build -o "$TMP_LOCAL" .
 TMP_REMOTE="/tmp/git-builder-new.$$"
 # Keepalives reduce mid-transfer disconnects on flaky paths.
 SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=30 -o ServerAliveInterval=30 -o ServerAliveCountMax=6)
+if [[ -n "$IDENTITY" ]]; then
+  if [[ ! -f "$IDENTITY" ]]; then
+    echo "Identity file not found: $IDENTITY" >&2
+    exit 1
+  fi
+  SSH_OPTS+=(-i "$IDENTITY")
+fi
+if [[ -n "$CERTIFICATE" ]]; then
+  if [[ ! -f "$CERTIFICATE" ]]; then
+    echo "Certificate file not found: $CERTIFICATE" >&2
+    exit 1
+  fi
+  SSH_OPTS+=(-o "CertificateFile=$CERTIFICATE")
+fi
 echo "Uploading to $HOST..."
 # Stream the binary over SSH instead of SCP; this has been more reliable on this host.
 ssh "${SSH_OPTS[@]}" "$HOST" "cat > '$TMP_REMOTE'" < "$TMP_LOCAL"
