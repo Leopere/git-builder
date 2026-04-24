@@ -2,13 +2,13 @@
 # Copy into Leopere/taylor-co-smsbridge repo root as: .git-builder.sh  &&  chmod +x .git-builder.sh
 #
 # Swarm secrets / volumes: stack.production.yml uses external secrets and volumes. This script
-# only pulls the production image and redeploys; it does not recreate secrets (see Woodpecker).
+# only pulls the production image and redeploys; it does not recreate secrets.
 #
-# Pattern matches app.a250.ca rfetcher (see copied-from-app-a250-rfetcher.sh), but:
-# - Image: git.nixc.us/colin/smsbridge:production (Woodpecker .woodpecker.yml)
-# - Waits for image to match git HEAD using OCI revision label, else GIT_COMMIT in image env
-# - Swarm: login to git.nixc.us if REGISTRY_USER + REGISTRY_PASSWORD are set (e.g. via config script_env)
-# - Stack / service: align STACK_NAME and SERVICE with `docker stack ls` / your stack (Woodpecker uses CI repo name)
+# Run on the Taylor Co Swarm manager / node that hosts this stack (not via ingress.nixc.us as a deploy path).
+# Pattern matches app.a250.ca rfetcher (see copied-from-app-a250-rfetcher.sh):
+# - Wait for image to match git HEAD (OCI revision label, else GIT_COMMIT in image env)
+# - Set IMAGE to whatever your pipeline tags (full registry/repo:tag). Default matches stack.production.yml image name.
+# - Optional: DOCKER_REGISTRY + REGISTRY_USER + REGISTRY_PASSWORD in script_env for docker login before pull
 set -eu
 
 log() {
@@ -28,14 +28,16 @@ need_cmd() {
   command -v "$1" >/dev/null 2>&1 || die "required command not found: $1"
 }
 
-# Default stack name must match: docker stack deploy -c stack.production.yml <name> (see Woodpecker deploy-production)
-STACK_NAME="${STACK_NAME:-taylor-co-smsbridge}"
-# Single service in stack.production.yml
+# Must match: docker stack ls  (e.g. smsbridge_smsbridge -> stack smsbridge)
+STACK_NAME="${STACK_NAME:-smsbridge}"
+# Single service name in stack.production.yml
 SWARM_SVC="smsbridge"
-IMAGE="${IMAGE:-git.nixc.us/colin/smsbridge:production}"
+# Tag in stack.production.yml is taylor-co-smsbridge:production; override with full image ref for docker pull
+IMAGE="${IMAGE:-taylor-co-smsbridge:production}"
 MAX_WAIT_SECS="${MAX_WAIT_SECS:-300}"
 POLL_INTERVAL_SECS="${POLL_INTERVAL_SECS:-10}"
-REGISTRY_HOST="${REGISTRY_HOST:-git.nixc.us}"
+# No default host — set when your registry needs login (e.g. script_env in git-builder config)
+DOCKER_REGISTRY="${DOCKER_REGISTRY:-}"
 
 image_revision() {
   _img="$1"
@@ -65,9 +67,9 @@ log "start $(date -u +"%Y-%m-%dT%H:%M:%SZ") host=$(hostname 2>/dev/null || echo 
 log "using prepared checkout at ${TARGET_COMMIT}"
 log "waiting for ${IMAGE} to match git HEAD: ${TARGET_COMMIT}"
 
-if [ -n "${REGISTRY_USER:-}" ] && [ -n "${REGISTRY_PASSWORD:-}" ]; then
-  log "logging into ${REGISTRY_HOST}"
-  echo "$REGISTRY_PASSWORD" | docker login -u "$REGISTRY_USER" --password-stdin "$REGISTRY_HOST" >/dev/null
+if [ -n "${REGISTRY_USER:-}" ] && [ -n "${REGISTRY_PASSWORD:-}" ] && [ -n "${DOCKER_REGISTRY}" ]; then
+  log "logging into ${DOCKER_REGISTRY}"
+  echo "$REGISTRY_PASSWORD" | docker login -u "$REGISTRY_USER" --password-stdin "$DOCKER_REGISTRY" >/dev/null
 fi
 
 deadline=$(( $(date +%s) + MAX_WAIT_SECS ))

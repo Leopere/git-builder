@@ -1,4 +1,4 @@
-# git-builder: SSH target smsbridge.taylor-co.com (Host sms-bridge in ~/.ssh/config).
+# git-builder on the Taylor host (e.g. ssh Host sms-bridge -> smsbridge.taylor-co.com:22). Not the ingress jumphost.
 # Alternative clone URL (HTTPS + github_token in config): https://github.com/Leopere/taylor-co-smsbridge.git
 
 poll_interval_seconds: 60
