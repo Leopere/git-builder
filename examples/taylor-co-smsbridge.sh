@@ -4,7 +4,7 @@
 # Swarm secrets / volumes: stack.production.yml uses external secrets and volumes. This script
 # only pulls the production image and redeploys; it does not recreate secrets.
 #
-# Run on the Taylor Co Swarm manager / node that hosts this stack (not via ingress.nixc.us as a deploy path).
+# Run on the Taylor Co Swarm manager / node that hosts this stack.
 # Pattern matches app.a250.ca rfetcher (see copied-from-app-a250-rfetcher.sh):
 # - Wait for image to match git HEAD (OCI revision label, else GIT_COMMIT in image env)
 # - Set IMAGE to whatever your pipeline tags (full registry/repo:tag). Default matches stack.production.yml image name.
