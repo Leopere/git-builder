@@ -29,22 +29,28 @@ if [[ ! -f "$PRIV_PATH" ]]; then
   ssh-keygen -t ed25519 -N "" -f "$PRIV_PATH" -C "git-builder ${REPO_SSH}"
 fi
 
-echo "Registering read-only deploy key on ${REPO} (if new)..."
-set +e
-gh_err="$(
-  gh repo deploy-key add -R "$REPO" -t "sms-bridge git-builder" "$PUB_PATH" 2>&1
-)"
-gh_ec=$?
-set -e
-if [[ $gh_ec -ne 0 ]]; then
-  if echo "$gh_err" | grep -qiE 'already|422|key already exists|already exists in deploy keys'; then
-    echo "GitHub: deploy key already present (OK)."
-  else
-    echo "$gh_err" >&2
-    exit "$gh_ec"
-  fi
+MARKER="$KEYDIR/.github-deploy-key-registered"
+if [[ -f "$MARKER" ]]; then
+  echo "GitHub: deploy key was registered before ($MARKER); skip gh repo deploy-key add."
 else
-  echo "GitHub: deploy key added."
+  echo "Registering read-only deploy key on ${REPO} (if new)..."
+  set +e
+  gh_err="$(
+    gh repo deploy-key add -R "$REPO" -t "sms-bridge git-builder" "$PUB_PATH" 2>&1
+  )"
+  gh_ec=$?
+  set -e
+  if [[ $gh_ec -ne 0 ]]; then
+    if echo "$gh_err" | grep -qiE 'already|422|key already exists'; then
+      echo "GitHub: deploy key already present (OK)."
+    else
+      echo "$gh_err" >&2
+      exit "$gh_ec"
+    fi
+  else
+    echo "GitHub: deploy key added."
+  fi
+  date -Iseconds >"$MARKER"
 fi
 
 if [[ "${DRY_RUN:-0}" == "1" ]]; then
